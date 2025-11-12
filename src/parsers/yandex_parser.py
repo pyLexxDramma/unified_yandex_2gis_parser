@@ -1,5 +1,3 @@
-# src/parsers/yandex_parser.py
-
 from __future__ import annotations
 
 import re
@@ -15,6 +13,7 @@ from bs4 import BeautifulSoup
 
 DOMNode = Dict[str, Any]
 
+
 class YandexParser(BaseParser):
     def __init__(self, driver: BaseDriver, settings: AppConfig):
         if not isinstance(driver, BaseDriver):
@@ -27,7 +26,6 @@ class YandexParser(BaseParser):
         self._reviews_scroll_step: int = getattr(self.settings.parser, 'yandex_reviews_scroll_step', 500)
         self._reviews_scroll_iterations_max: int = getattr(self.settings.parser, 'yandex_reviews_scroll_max_iter', 100)
         self._reviews_scroll_iterations_min: int = getattr(self.settings.parser, 'yandex_reviews_scroll_min_iter', 30)
-
         self._csrf_token: Optional[str] = None
 
     @staticmethod
@@ -41,7 +39,10 @@ class YandexParser(BaseParser):
 
     def check_captcha(self) -> None:
         page_source, soup = self._get_page_source_and_soup()
-        is_captcha = soup.find("div", {"class": "CheckboxCaptcha"}) or soup.find("div", {"class": "AdvancedCaptcha"})
+
+        is_captcha = soup.find("div", {"class": "CheckboxCaptcha"}) or \
+                     soup.find("div", {"class": "AdvancedCaptcha"})
+
         if is_captcha:
             self._logger.warning(f"Captcha detected. Waiting for {self._captcha_wait_time} seconds.")
             time.sleep(self._captcha_wait_time)
@@ -108,7 +109,8 @@ class YandexParser(BaseParser):
         try:
             rating_container = soup_content.find("div", {"class": "business-card-title-view__header-rating"})
             if rating_container:
-                rating_text_element = rating_container.find("span", {"class": "business-rating-badge-view__rating-text"})
+                rating_text_element = rating_container.find("span",
+                                                            {"class": "business-rating-badge-view__rating-text"})
                 if rating_text_element:
                     rating = rating_text_element.getText()
             return rating
@@ -116,20 +118,16 @@ class YandexParser(BaseParser):
             self._logger.error(f"Error getting rating: {e}")
             return ""
 
-    def get_reviews(self, driver: BaseDriver) -> List[str]:
+    def get_reviews(self) -> List[str]:
         self._logger.info("Getting reviews...")
 
-        try:
-            reviews_trigger_element = driver.get_element_by_locator(('css selector', '._name_reviews'))
-            if reviews_trigger_element:
-                driver.perform_click(reviews_trigger_element)
-                time.sleep(1)
-            else:
-                self._logger.warning("Could not find the trigger element for reviews section.")
-        except Exception as e:
-            self._logger.warning(f"Could not click on reviews trigger element: {e}")
-
         reviews: List[str] = []
+
+        try:
+            page_source, soup_content = self._get_page_source_and_soup()
+        except Exception as e:
+            self._logger.error(f"Failed to get page source before handling reviews: {e}")
+            return []
 
         reviews_count = 0
         try:
@@ -144,7 +142,7 @@ class YandexParser(BaseParser):
             self._logger.warning(f"Could not determine review count: {e}")
         except Exception as e:
             self._logger.error(f"Unexpected error getting review count: {e}")
-            return ""
+            return []
 
         if reviews_count > 150:
             find_range = range(self._reviews_scroll_iterations_max)
@@ -155,14 +153,14 @@ class YandexParser(BaseParser):
         for i in find_range:
             try:
                 script_to_execute = f"document.querySelectorAll('{scroll_container_selector}')[1].scrollTop={self._reviews_scroll_step * i};"
-                driver.execute_script(script_to_execute)
+                self.driver.execute_script(script_to_execute)
                 time.sleep(0.2)
             except Exception as e:
                 self._logger.warning(f"Error during scroll iteration {i}: {e}. Stopping scroll.")
                 break
 
         try:
-            page_source, soup_content = self._get_page_source_and_soup()
+            page_source, soup_content = self._get_page_source_and_soup()  # Получаем новый soup_content
             for data in soup_content.find_all("span", {"class": "business-review-view__body-text"}):
                 reviews.append(data.getText())
             self._logger.info(f"Successfully extracted {len(reviews)} review texts.")
@@ -194,7 +192,8 @@ class YandexParser(BaseParser):
             "opening_hours": self.get_opening_hours(soup_content),
             "goods": self.get_goods(soup_content),
             "rating": self.get_rating(soup_content),
-            "reviews": self.get_reviews(self.driver),
+            "reviews": self.get_reviews(),
         }
+
 
         self._logger.info(f"Parsed data for: {data.get('name')}")
