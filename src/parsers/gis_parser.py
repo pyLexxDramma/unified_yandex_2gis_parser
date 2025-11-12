@@ -33,17 +33,21 @@ class GisParser(BaseParser):
             'aggregated_reviews_count': 'Всего отзывов',
             'aggregated_positive_reviews': 'Всего положительных отзывов',
             'aggregated_negative_reviews': 'Всего отрицательных отзывов',
+            'aggregated_answered_count': 'Всего отвечено (карточки)',
+            'aggregated_avg_response_time': 'Среднее время ответа (дни)',
+
+            # --- Детальные данные по каждой карточке ---
             'card_name': 'Название карточки',
             'card_rating': 'Рейтинг карточки',
             'card_reviews_count': 'Отзывов по карточке',
             'card_website': 'Сайт карточки',
             'card_phone': 'Телефон карточки',
             'card_rubrics': 'Рубрики карточки',
-            'card_response_status': 'Статус ответа',
-            'card_avg_response_time': 'Среднее время ответа',
+            'card_response_status': 'Статус ответа (карточка)',
+            'card_avg_response_time': 'Среднее время ответа (карточка)',  # Сложно извлечь
             'card_reviews_positive': 'Положительных отзывов (карточка)',
             'card_reviews_negative': 'Отрицательных отзывов (карточка)',
-            'card_reviews_texts': 'Тексты отзывов (карточка)'
+            'card_reviews_texts': 'Тексты отзывов (карточка)',
         }
 
         self._current_page_number: int = 1
@@ -53,8 +57,8 @@ class GisParser(BaseParser):
             'total_reviews_count': 0,
             'total_positive_reviews': 0,
             'total_negative_reviews': 0,
-            'total_response_status': 0,
-            'total_response_time': 0
+            'total_answered_count': 0,
+            'total_response_time_sum_days': 0.0,
         }
         self._collected_card_data: List[Dict[str, Any]] = []
         self._search_query_name: str = ""
@@ -65,25 +69,25 @@ class GisParser(BaseParser):
 
     def _add_xhr_counter_script(self) -> str:
         xhr_script = r'''
-             (function() {
-                 var oldOpen = XMLHttpRequest.prototype.open;
-                 XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
-                     if (url.match(/^https?\:\/\/[^\/]*2gis\.[a-z]+/i)) {
-                         if (window.openHTTPs === undefined) {
-                             window.openHTTPs = 1;
-                         } else {
-                             window.openHTTPs++;
-                         }
-                         this.addEventListener("readystatechange", function() {
-                             if (this.readyState == 4) {
-                                 window.openHTTPs--;
-                             }
-                         }, false);
-                     }
-                     oldOpen.call(this, method, url, async, user, pass);
-                 }
-             })();
-         '''
+            (function() {
+                var oldOpen = XMLHttpRequest.prototype.open;
+                XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
+                    if (url.match(/^https?\:\/\/[^\/]*2gis\.[a-z]+/i)) {
+                        if (window.openHTTPs === undefined) {
+                            window.openHTTPs = 1;
+                        } else {
+                            window.openHTTPs++;
+                        }
+                        this.addEventListener("readystatechange", function() {
+                            if (this.readyState == 4) {
+                                window.openHTTPs--;
+                            }
+                        }, false);
+                    }
+                    oldOpen.call(this, method, url, async, user, pass);
+                }
+            })();
+        '''
         return xhr_script
 
     def _get_links(self) -> List[DOMNode]:
@@ -171,7 +175,8 @@ class GisParser(BaseParser):
             for review in all_reviews:
                 review_rating = review.get('rating')
                 review_text = review.get('text', '')
-                reviews_texts.append(f"[{review_rating}] {review_text}")
+                if review_text:
+                    reviews_texts.append(f"[{review_rating}] {review_text}")
 
                 if review_rating is not None:
                     try:
@@ -183,8 +188,8 @@ class GisParser(BaseParser):
                     except (ValueError, TypeError):
                         pass
 
-            response_status = "UNKNOWN"
-            avg_response_time_days = ""
+            answered_count = item.get('metadata', {}).get('answered_count', 0)
+            avg_response_time_days = item.get('metadata', {}).get('avg_response_time_days', '')
 
             return {
                 'name': name,
@@ -194,11 +199,11 @@ class GisParser(BaseParser):
                 'card_website': card_website,
                 'card_phone': card_phone,
                 'card_rubrics': card_rubrics,
-                'card_response_status': response_status,
+                'card_response_status': "Yes" if answered_count > 0 else "No",  # Простая индикация, есть ли ответ
                 'card_avg_response_time': avg_response_time_days,
                 'card_reviews_positive': positive_reviews,
                 'card_reviews_negative': negative_reviews,
-                'card_reviews_texts': "; ".join(reviews_texts),
+                'card_reviews_texts': "; ".join(reviews_texts),  # Собираем все тексты отзывов
             }
         except Exception as e:
             self._logger.error(f"Error extracting item data from API response: {e}")
@@ -212,6 +217,11 @@ class GisParser(BaseParser):
         search_url = self._url
         self._search_query_name = search_url.split('/search/')[1].split('/')[
             0] if '/search/' in search_url else 'Unknown Search'
+        query_match = re.search(r'/search/([^/]+)', search_url)
+        if query_match:
+            self._search_query_name = urllib.parse.unquote(query_match.group(1)).replace('+', ' ')
+        else:
+            self._search_query_name = 'Unknown Search'
 
         try:
             self.driver.navigate(search_url, timeout=120)
@@ -220,9 +230,8 @@ class GisParser(BaseParser):
             return
 
         self._current_page_number = 1
-        collected_card_count = 0
 
-        while collected_card_count < self._max_records:
+        while self._aggregated_data['total_cards'] < self._max_records:
             self._logger.info(f"Processing page {self._current_page_number}...")
 
             if not self._wait_requests_finished():
@@ -231,10 +240,14 @@ class GisParser(BaseParser):
             card_links = self._get_links()
             if not card_links:
                 self._logger.info(f"No company card links found on page {self._current_page_number}.")
+                if self._current_page_number > 1 and self._aggregated_data['total_cards'] > 0:
+                    self._logger.info(
+                        "No cards on current page, but cards were found earlier. Assuming end of results.")
+                    break
 
-            cards_on_this_page = 0
+            cards_processed_on_page = 0
             for link_node in card_links:
-                if collected_card_count >= self._max_records:
+                if self._aggregated_data['total_cards'] >= self._max_records:
                     break
 
                 target_link_href = link_node.get('attributes', {}).get('href')
@@ -249,7 +262,8 @@ class GisParser(BaseParser):
                     self._logger.error(f"Failed to click on company link {target_link_href}: {e}")
                     continue
 
-                response = self.driver.wait_response(self._item_response_pattern, timeout=15)
+                response = self.driver.wait_response(r'https://catalog\.api\.2gis\..*/items/byid',
+                                                     timeout=15)  # Паттерн для API 2ГИС
                 if not response:
                     self._logger.error("Did not receive API response for the company card.")
                     continue
@@ -270,8 +284,6 @@ class GisParser(BaseParser):
                 if processed_item:
                     self._collected_card_data.append(processed_item)
                     cards_on_this_page += 1
-                    collected_card_count += 1
-
                     self._aggregated_data['total_cards'] += 1
 
                     rating_str = processed_item.get('card_rating', '')
@@ -285,11 +297,23 @@ class GisParser(BaseParser):
                     self._aggregated_data['total_positive_reviews'] += processed_item.get('card_reviews_positive', 0)
                     self._aggregated_data['total_negative_reviews'] += processed_item.get('card_reviews_negative', 0)
 
+                    answered_count_str = processed_item.get('card_response_status',
+                                                            '')
+                    if answered_count_str == "Yes":
+                        self._aggregated_data['total_answered_count'] += 1
+
+                    avg_response_time_str = processed_item.get('card_avg_response_time', '')
+                    try:
+                        if avg_response_time_str:
+                            self._aggregated_data['total_response_time_sum_days'] += float(avg_response_time_str)
+                    except (ValueError, TypeError):
+                        pass
+
                     self._logger.debug(f"Collected detailed data for: {processed_item.get('card_name')}")
                 else:
                     self._logger.warning("No processed item data extracted for a card.")
 
-            if collected_card_count >= self._max_records:
+            if self._aggregated_data['total_cards'] >= self._max_records:
                 self._logger.info(f'Reached maximum allowed records ({self._max_records}). Stopping parse.')
                 break
 
@@ -311,30 +335,51 @@ class GisParser(BaseParser):
             self.driver.clear_requests()
 
         if self._aggregated_data['total_cards'] > 0:
-            final_rating = round(self._aggregated_data['total_rating_sum'] / self._aggregated_data['total_cards'], 2) if \
-                self._aggregated_data['total_cards'] > 0 and self._aggregated_data['total_rating_sum'] else ''
+            final_rating = (self._aggregated_data['total_rating_sum'] / self._aggregated_data['total_cards']) if \
+                self._aggregated_data['total_cards'] > 0 else ''
+            if final_rating:
+                final_rating = round(final_rating, 2)
+
+            avg_response_time_days = ''
+            if self._aggregated_data['total_cards'] > 0 and self._aggregated_data['total_response_time_sum_days'] > 0:
+                avg_response_time_days = round(
+                    self._aggregated_data['total_response_time_sum_days'] / self._aggregated_data['total_cards'], 1)
 
             final_record = {
-                'name': self._collected_card_data[0].get('name',
-                                                         'N/A') if self._collected_card_data else self._search_query_name,
-                'rating': final_rating,
-                'reviews_count': self._aggregated_data['total_reviews_count'],
-                'positive_reviews': self._aggregated_data['total_positive_reviews'],
-                'negative_reviews': self._aggregated_data['total_negative_reviews'],
-                'website': self._collected_card_data[0].get('card_website', '') if self._collected_card_data else '',
-                'total_cards_found': self._aggregated_data['total_cards']
+                'search_query_name': self._search_query_name,
+                'total_cards_found': self._aggregated_data['total_cards'],
+                'aggregated_rating': final_rating,
+                'aggregated_reviews_count': self._aggregated_data['total_reviews_count'],
+                'aggregated_positive_reviews': self._aggregated_data['total_positive_reviews'],
+                'aggregated_negative_reviews': self._aggregated_data['total_negative_reviews'],
+                'aggregated_answered_count': self._aggregated_data['total_answered_count'],
+                'aggregated_avg_response_time': avg_response_time_days,
+
+                'card_name': self._collected_card_data[0].get('card_name',
+                                                              'N/A') if self._collected_card_data else 'N/A',
+                'card_rating': self._collected_card_data[0].get('card_rating', '') if self._collected_card_data else '',
+                'card_reviews_count': self._collected_card_data[0].get('card_reviews_count',
+                                                                       '') if self._collected_card_data else '',
+                'card_website': self._collected_card_data[0].get('card_website',
+                                                                 '') if self._collected_card_data else '',
+                'card_phone': self._collected_card_data[0].get('card_phone', '') if self._collected_card_data else '',
+                'card_rubrics': self._collected_card_data[0].get('card_rubrics',
+                                                                 '') if self._collected_card_data else '',
+                'card_response_status': self._collected_card_data[0].get('card_response_status',
+                                                                         '') if self._collected_card_data else '',
+                'card_avg_response_time': self._collected_card_data[0].get('card_avg_response_time',
+                                                                           '') if self._collected_card_data else '',
+                'card_reviews_positive': self._collected_card_data[0].get('card_reviews_positive',
+                                                                          0) if self._collected_card_data else 0,
+                'card_reviews_negative': self._collected_card_data[0].get('card_reviews_negative',
+                                                                          0) if self._collected_card_data else 0,
+                'card_reviews_texts': self._collected_card_data[0].get('card_reviews_texts',
+                                                                       '') if self._collected_card_data else '',
             }
 
             row_to_write = {}
             for key, header in self._data_mapping.items():
-                if key.startswith('aggregated_') and key.replace('aggregated_', '') in final_record:
-                    row_to_write[header] = final_record.get(key.replace('aggregated_', ''))
-                elif key.startswith('card_') and self._collected_card_data:
-                    row_to_write[header] = self._collected_card_data[0].get(key)
-                elif key in final_record:
-                    row_to_write[header] = final_record.get(key)
-                else:
-                    row_to_write[header] = ''
+                row_to_write[header] = final_record.get(key, '')
 
             try:
                 writer.write(row_to_write)

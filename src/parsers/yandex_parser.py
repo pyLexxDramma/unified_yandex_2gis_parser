@@ -35,6 +35,9 @@ class YandexParser(BaseParser):
             'aggregated_reviews_count': 'Всего отзывов',
             'aggregated_positive_reviews': 'Всего положительных отзывов',
             'aggregated_negative_reviews': 'Всего отрицательных отзывов',
+            'aggregated_answered_count': 'Всего отвечено (карточки)',
+            'aggregated_avg_response_time': 'Среднее время ответа (дни)',
+
             'card_name': 'Название карточки',
             'card_address': 'Адрес карточки',
             'card_rating': 'Рейтинг карточки',
@@ -42,6 +45,8 @@ class YandexParser(BaseParser):
             'card_website': 'Сайт карточки',
             'card_phone': 'Телефон карточки',
             'card_rubrics': 'Рубрики карточки',
+            'card_response_status': 'Статус ответа (карточка)',
+            'card_avg_response_time': 'Среднее время ответа (карточка)',
             'card_reviews_positive': 'Положительных отзывов (карточка)',
             'card_reviews_negative': 'Отрицательных отзывов (карточка)',
             'card_reviews_texts': 'Тексты отзывов (карточка)',
@@ -54,6 +59,8 @@ class YandexParser(BaseParser):
             'total_reviews_count': 0,
             'total_positive_reviews': 0,
             'total_negative_reviews': 0,
+            'total_answered_count': 0,
+            'total_response_time_sum_days': 0.0,
         }
         self._collected_card_data: List[Dict[str, Any]] = []
         self._search_query_name: str = ""
@@ -100,6 +107,12 @@ class YandexParser(BaseParser):
             website_element = card_element.select_one('a[itemprop="url"]')
             website = website_element.get('href') if website_element else ''
 
+            positive_reviews = 0
+            negative_reviews = 0
+            response_status = "UNKNOWN"
+            avg_response_time_days = ""
+            reviews_texts = ""
+
             return {
                 'card_name': name,
                 'card_address': address,
@@ -108,9 +121,11 @@ class YandexParser(BaseParser):
                 'card_website': website,
                 'card_phone': '',
                 'card_rubrics': '',
-                'card_reviews_positive': 0,
-                'card_reviews_negative': 0,
-                'card_reviews_texts': '',
+                'card_response_status': response_status,
+                'card_avg_response_time': avg_response_time_days,
+                'card_reviews_positive': positive_reviews,
+                'card_reviews_negative': negative_reviews,
+                'card_reviews_texts': reviews_texts,
             }
         except Exception as e:
             self._logger.error(f"Error processing Yandex card snippet: {e}")
@@ -200,9 +215,9 @@ class YandexParser(BaseParser):
             return
 
         search_url = self._url
-        self._search_query_name = re.search(r'text=([^&]+)', search_url)
-        if self._search_query_name:
-            self._search_query_name = urllib.parse.unquote(self._search_query_name.group(1)).replace('+', ' ')
+        query_match = re.search(r'text=([^&]+)', search_url)
+        if query_match:
+            self._search_query_name = urllib.parse.unquote(query_match.group(1)).replace('+', ' ')
         else:
             self._search_query_name = 'Unknown Search'
 
@@ -227,14 +242,15 @@ class YandexParser(BaseParser):
             company_card_selector = 'div.search-business-snippet-view'
             company_cards = soup_content.select(company_card_selector)
 
-            if not company_cards and self._current_page_number == 1:
-                self._logger.warning("No company cards found on the first page.")
-                break
-            elif not company_cards:
-                self._logger.info(f"No company cards found on page {self._current_page_number}. Ending pagination.")
-                break
+            if not company_cards:
+                self._logger.info(f"No company cards found on page {self._current_page_number}.")
+                if self._current_page_number == 1 and not self._aggregated_data['total_cards']:
+                    pass
+                elif self._current_page_number > 1:
+                    self._logger.info(
+                        "No cards on current page, but cards were found earlier. Assuming end of results.")
+                    break
 
-            cards_on_this_page = 0
             for card_element in company_cards:
                 if self._aggregated_data['total_cards'] >= self._max_records:
                     break
@@ -242,7 +258,8 @@ class YandexParser(BaseParser):
                 processed_item = self._get_card_snippet_data(card_element)
 
                 if processed_item:
-                    # --- Агрегация данных ---
+                    self._aggregated_data['total_cards'] += 1
+
                     rating_str = processed_item.get('card_rating', '')
                     try:
                         if rating_str:
@@ -253,17 +270,26 @@ class YandexParser(BaseParser):
                     reviews_count = processed_item.get('card_reviews_count', 0)
                     self._aggregated_data['total_reviews_count'] += reviews_count
 
-                    self._collected_card_data.append(processed_item)
-                    cards_on_this_page += 1
-                    self._aggregated_data['total_cards'] += 1
+                    # Положительные/отрицательные отзывы - из сниппета их не получить, пока оставляем 0
+                    # Если нужно, потребуется кликать на каждую карточку и парсить детальную страницу.
 
+                    self._collected_card_data.append(processed_item)
                     self._logger.debug(f"Collected snippet data for: {processed_item.get('card_name')}")
+                else:
+                    self._logger.warning("No processed item data extracted for a card.")
 
             if self._aggregated_data['total_cards'] >= self._max_records:
                 self._logger.info(f'Reached maximum allowed records ({self._max_records}). Stopping parse.')
                 break
 
-            pagination_links = self._get_page_navigation_links()
+            pagination_links = self._get_page_navigation_links()  # Адаптировать селектор для Яндекс!
+            # Пример селектора для Яндекс: 'a.link.link_size_s.link_theme_normal.link_jslider-page-item'
+            # Или: 'a.pager__link.pager__link_direction_next'
+            # Проверить реальную структуру страницы.
+            # Для примера, используем generic селектор, который может не работать.
+            if not pagination_links:
+                self._logger.info(f"No pagination links found on page {self._current_page_number}.")
+                break
 
             next_page_number = self._current_page_number + 1
 
@@ -292,6 +318,9 @@ class YandexParser(BaseParser):
                 'aggregated_reviews_count': self._aggregated_data['total_reviews_count'],
                 'aggregated_positive_reviews': self._aggregated_data['total_positive_reviews'],
                 'aggregated_negative_reviews': self._aggregated_data['total_negative_reviews'],
+                'aggregated_answered_count': self._aggregated_data['total_answered_count'],
+                'aggregated_avg_response_time': self._aggregated_data['total_response_time_sum_days'],
+
                 'card_name': self._collected_card_data[0].get('card_name',
                                                               'N/A') if self._collected_card_data else 'N/A',
                 'card_address': self._collected_card_data[0].get('card_address',

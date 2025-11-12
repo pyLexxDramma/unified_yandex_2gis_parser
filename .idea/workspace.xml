@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Реализована точка входа в веб-приложение flask и HTML-шаблон (src/webapp/app.py, src/webapp / templates/)">
+    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Рефакторинг: реализована основная логика синтаксического анализа для 2GIS и Яндекса, настройка веб-приложения Flask с базовым пользовательским интерфейсом и консолидированы соответствующие изменения, в частности, разбиение на страницы, агрегацию данных и первоначальный анализ подробных данных карты.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsers/gis_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/gis_parser.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsers/yandex_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/yandex_parser.py" afterDir="false" />
@@ -77,7 +77,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1762926699347</updated>
-      <workItem from="1762926700473" duration="20149000" />
+      <workItem from="1762926700473" duration="22239000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -191,7 +191,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762945011090</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="Рефакторинг: реализована основная логика синтаксического анализа для 2GIS и Яндекса, настройка веб-приложения Flask с базовым пользовательским интерфейсом и консолидированы соответствующие изменения, в частности, разбиение на страницы, агрегацию данных и первоначальный анализ подробных данных карты.">
+      <option name="closed" value="true" />
+      <created>1762951862807</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1762951862807</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -212,6 +220,7 @@
     <MESSAGE value="Рефакторинг: сделал YandexParser более последовательным - get_reviews обрабатывает свое собственное обновление soup (src/parsers/yandex_parser.py)" />
     <MESSAGE value="Внедрение веб-приложения Flask в качестве точки входа (src/webapp/app.py)" />
     <MESSAGE value="Реализована точка входа в веб-приложение flask и HTML-шаблон (src/webapp/app.py, src/webapp / templates/)" />
-    <option name="LAST_COMMIT_MESSAGE" value="Реализована точка входа в веб-приложение flask и HTML-шаблон (src/webapp/app.py, src/webapp / templates/)" />
+    <MESSAGE value="Рефакторинг: реализована основная логика синтаксического анализа для 2GIS и Яндекса, настройка веб-приложения Flask с базовым пользовательским интерфейсом и консолидированы соответствующие изменения, в частности, разбиение на страницы, агрегацию данных и первоначальный анализ подробных данных карты." />
+    <option name="LAST_COMMIT_MESSAGE" value="Рефакторинг: реализована основная логика синтаксического анализа для 2GIS и Яндекса, настройка веб-приложения Flask с базовым пользовательским интерфейсом и консолидированы соответствующие изменения, в частности, разбиение на страницы, агрегацию данных и первоначальный анализ подробных данных карты." />
   </component>
 </project>
