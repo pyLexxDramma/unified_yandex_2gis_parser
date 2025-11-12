@@ -1,0 +1,13 @@
+selenium
+pychrome
+pydantic
+lxml
+python-dotenv
+webdriver-manager
+pygame
+Flask
+ReportLab
+smtplib
+email
+requests
+psutil
