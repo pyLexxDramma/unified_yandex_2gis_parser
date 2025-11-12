@@ -4,13 +4,23 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Рефакторинг: сделал YandexParser более последовательным - get_reviews обрабатывает свое собственное обновление soup (src/parsers/yandex_parser.py)">
+    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Внедрение веб-приложения Flask в качестве точки входа (src/webapp/app.py)">
+      <change afterPath="$PROJECT_DIR$/src/webapp/templates/index.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/webapp/templates/task_status.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/webapp/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/webapp/app.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="HTML File" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -31,13 +41,16 @@
   "associatedIndex": 7
 }]]></component>
   <component name="ProjectId" id="35MjBa79bkrtaiycc0sD1cfLd4U" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "DefaultHtmlFileTemplate": "HTML File",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "main",
@@ -65,7 +78,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1762926699347</updated>
-      <workItem from="1762926700473" duration="13786000" />
+      <workItem from="1762926700473" duration="15247000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -163,7 +176,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762941924773</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="Внедрение веб-приложения Flask в качестве точки входа (src/webapp/app.py)">
+      <option name="closed" value="true" />
+      <created>1762943609387</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1762943609387</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -182,6 +203,7 @@
     <MESSAGE value="Реализация CSVWriter с логикой последующей обработки (src/storage/csv_writer.py)" />
     <MESSAGE value="Реализация YandexParser с помощью ChromeDriver и адаптация логики Яндекс Карт (src/parsers/yandex_parser.py)" />
     <MESSAGE value="Рефакторинг: сделал YandexParser более последовательным - get_reviews обрабатывает свое собственное обновление soup (src/parsers/yandex_parser.py)" />
-    <option name="LAST_COMMIT_MESSAGE" value="Рефакторинг: сделал YandexParser более последовательным - get_reviews обрабатывает свое собственное обновление soup (src/parsers/yandex_parser.py)" />
+    <MESSAGE value="Внедрение веб-приложения Flask в качестве точки входа (src/webapp/app.py)" />
+    <option name="LAST_COMMIT_MESSAGE" value="Внедрение веб-приложения Flask в качестве точки входа (src/webapp/app.py)" />
   </component>
 </project>
