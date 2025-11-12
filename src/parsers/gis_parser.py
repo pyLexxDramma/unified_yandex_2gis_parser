@@ -1,5 +1,3 @@
-# src/parsers/gis_parser.py
-
 from __future__ import annotations
 
 import json
@@ -24,12 +22,42 @@ class GisParser(BaseParser):
         super().__init__(driver, settings)
         self._url: str = ""
 
-        self._item_response_pattern: str = r'https://catalog\.api\.2gis.[^/]+/.*/items/byid'
         self._skip_404_response: bool = self.settings.parser.skip_404_response
         self._delay_between_clicks: int = self.settings.parser.delay_between_clicks
         self._max_records: int = self.settings.parser.max_records
-        self._use_gc: bool = self.settings.parser.use_gc
-        self._gc_pages_interval: int = self.settings.parser.gc_pages_interval
+
+        self._data_mapping: Dict[str, str] = {
+            'search_query_name': 'Название поиска',
+            'total_cards_found': 'Всего карточек найдено',
+            'aggregated_rating': 'Общий рейтинг',
+            'aggregated_reviews_count': 'Всего отзывов',
+            'aggregated_positive_reviews': 'Всего положительных отзывов',
+            'aggregated_negative_reviews': 'Всего отрицательных отзывов',
+            'card_name': 'Название карточки',
+            'card_rating': 'Рейтинг карточки',
+            'card_reviews_count': 'Отзывов по карточке',
+            'card_website': 'Сайт карточки',
+            'card_phone': 'Телефон карточки',
+            'card_rubrics': 'Рубрики карточки',
+            'card_response_status': 'Статус ответа',
+            'card_avg_response_time': 'Среднее время ответа',
+            'card_reviews_positive': 'Положительных отзывов (карточка)',
+            'card_reviews_negative': 'Отрицательных отзывов (карточка)',
+            'card_reviews_texts': 'Тексты отзывов (карточка)'
+        }
+
+        self._current_page_number: int = 1
+        self._aggregated_data: Dict[str, Any] = {
+            'total_cards': 0,
+            'total_rating_sum': 0.0,
+            'total_reviews_count': 0,
+            'total_positive_reviews': 0,
+            'total_negative_reviews': 0,
+            'total_response_status': 0,
+            'total_response_time': 0
+        }
+        self._collected_card_data: List[Dict[str, Any]] = []
+        self._search_query_name: str = ""
 
     @staticmethod
     def get_url_pattern() -> str:
@@ -37,30 +65,26 @@ class GisParser(BaseParser):
 
     def _add_xhr_counter_script(self) -> str:
         xhr_script = r'''
-            (function() {
-                var oldOpen = XMLHttpRequest.prototype.open;
-                XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
-                    if (url.match(/^https?\:\/\/[^\/]*2gis\.[a-z]+/i)) {
-                        if (window.openHTTPs === undefined) {
-                            window.openHTTPs = 1;
-                        } else {
-                            window.openHTTPs++;
-                        }
-                        this.addEventListener("readystatechange", function() {
-                            if (this.readyState == 4) {
-                                window.openHTTPs--;
-                            }
-                        }, false);
-                    }
-                    oldOpen.call(this, method, url, async, user, pass);
-                }
-            })();
-        '''
+             (function() {
+                 var oldOpen = XMLHttpRequest.prototype.open;
+                 XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
+                     if (url.match(/^https?\:\/\/[^\/]*2gis\.[a-z]+/i)) {
+                         if (window.openHTTPs === undefined) {
+                             window.openHTTPs = 1;
+                         } else {
+                             window.openHTTPs++;
+                         }
+                         this.addEventListener("readystatechange", function() {
+                             if (this.readyState == 4) {
+                                 window.openHTTPs--;
+                             }
+                         }, false);
+                     }
+                     oldOpen.call(this, method, url, async, user, pass);
+                 }
+             })();
+         '''
         return xhr_script
-
-    @property
-    def _is_gui_enabled(self) -> bool:
-        return False
 
     def _get_links(self) -> List[DOMNode]:
         def valid_link(node: DOMNode) -> bool:
@@ -94,23 +118,21 @@ class GisParser(BaseParser):
             self._logger.error(f"Error checking window.openHTTPs: {e}. Assuming requests are finished.")
             return True
 
-    def _get_available_pages(self) -> Dict[int, DOMNode]:
-        dom_tree_nodes = self.driver.get_elements_by_locator(('css selector', 'a'))
-        available_pages = {}
-        for link_node in dom_tree_nodes:
-            href = link_node.get('attributes', {}).get('href')
-            if href:
-                link_match = re.match(r'.*/search/.*/page/(?P<page_number>\d+)', href)
-                if link_match:
-                    try:
-                        page_number = int(link_match.group('page_number'))
-                        available_pages[page_number] = link_node
-                    except ValueError:
-                        pass
-        return available_pages
+    def _get_page_navigation_links(self) -> Dict[int, DOMNode]:
+        nav_links = {}
+        try:
+            pagination_elements = self.driver.get_elements_by_locator(('css selector', '.pagination-item'))
+            for link_node in pagination_elements:
+                text = link_node.get('text', '').strip()
+                if text.isdigit():
+                    page_number = int(text)
+                    nav_links[page_number] = link_node
+            return nav_links
+        except Exception as e:
+            self._logger.error(f"Error finding pagination links: {e}")
+            return {}
 
-    def _go_page(self, n_page: int) -> Optional[int]:
-        available_pages = self._get_available_pages()
+    def _go_page(self, n_page: int, available_pages: Dict[int, DOMNode]) -> Optional[int]:
         if n_page in available_pages:
             link_node = available_pages[n_page]
             try:
@@ -124,155 +146,226 @@ class GisParser(BaseParser):
             self._logger.warning(f"Page {n_page} not found in available pages.")
             return None
 
+    def _get_item_data_from_response(self, response_data: Dict[str, Any], card_url: str) -> Optional[Dict[str, Any]]:
+        try:
+            items = response_data.get('items')
+            if not items or not isinstance(items, list) or not items[0]:
+                self._logger.warning("API response has no items or items is not a list.")
+                return None
+
+            item = items[0]
+
+            name = item.get('name', '')
+            rating = item.get('rating', '')
+            reviews_count = item.get('reviews_count', 0)
+
+            card_website = item.get('attributes', {}).get('website', '')
+            card_phone = self._format_phones(item.get('attributes', {}).get('phones', []))
+            card_rubrics = self._format_rubrics(item.get('rubrics', []))
+
+            all_reviews = item.get('reviews', [])
+            positive_reviews = 0
+            negative_reviews = 0
+            reviews_texts = []
+
+            for review in all_reviews:
+                review_rating = review.get('rating')
+                review_text = review.get('text', '')
+                reviews_texts.append(f"[{review_rating}] {review_text}")
+
+                if review_rating is not None:
+                    try:
+                        review_rating_num = float(review_rating)
+                        if 4.0 <= review_rating_num <= 5.0:
+                            positive_reviews += 1
+                        elif 1.0 <= review_rating_num <= 3.0:
+                            negative_reviews += 1
+                    except (ValueError, TypeError):
+                        pass
+
+            response_status = "UNKNOWN"
+            avg_response_time_days = ""
+
+            return {
+                'name': name,
+                'card_name': name,
+                'card_rating': rating,
+                'card_reviews_count': reviews_count,
+                'card_website': card_website,
+                'card_phone': card_phone,
+                'card_rubrics': card_rubrics,
+                'card_response_status': response_status,
+                'card_avg_response_time': avg_response_time_days,
+                'card_reviews_positive': positive_reviews,
+                'card_reviews_negative': negative_reviews,
+                'card_reviews_texts': "; ".join(reviews_texts),
+            }
+        except Exception as e:
+            self._logger.error(f"Error extracting item data from API response: {e}")
+            return None
+
     def parse(self, writer: BaseWriter) -> None:
         if not isinstance(self.driver, BaseDriver):
             self._logger.error("Invalid driver type provided to GisParser.")
             return
 
-        current_page_number = 1
-        url = re.sub(r'/page/\d+', '', self._url, re.I)
-
-        walk_page_match = re.search(r'/page/(?P<page_number>\d+)', self._url, re.I)
-        walk_page_number = int(walk_page_match.group('page_number')) if walk_page_match else None
-
-        xhr_script = self._add_xhr_counter_script()
-        self.driver.add_start_script(xhr_script)
+        search_url = self._url
+        self._search_query_name = search_url.split('/search/')[1].split('/')[
+            0] if '/search/' in search_url else 'Unknown Search'
 
         try:
-            self.driver.navigate(url, referer='https://google.com', timeout=120)
+            self.driver.navigate(search_url, timeout=120)
         except Exception as e:
-            self._logger.error(f"Failed to navigate to {url}: {e}")
+            self._logger.error(f"Failed to navigate to {search_url}: {e}")
             return
 
-        document_response = None
-        try:
-            responses = self.driver.get_responses(url_pattern=r'catalog\.api\.2gis\..*/items/byid', timeout=10)
-            if responses:
-                for resp in responses:
-                    if re.search(self._item_response_pattern, resp.get('url', '')):
-                        document_response = resp
-                        break
-            if not document_response:
-                responses_html = self.driver.get_responses(timeout=5)
-                if responses_html:
-                    document_response = responses_html[0]
-        except Exception as e:
-            self._logger.error(f"Could not retrieve initial server response: {e}")
+        self._current_page_number = 1
+        collected_card_count = 0
 
-        if not document_response:
-            self._logger.error("Error getting server response for initial page.")
-            return
+        while collected_card_count < self._max_records:
+            self._logger.info(f"Processing page {self._current_page_number}...")
 
-        if document_response.get('status') == 404:
-            self._logger.warning('Server returned "No exact matches / Not found".')
-            if self._skip_404_response:
-                return
-
-        collected_records = 0
-        visited_links: set[str] = set()
-
-        while True:
             if not self._wait_requests_finished():
-                self._logger.warning(
-                    "Requests did not finish within the expected timeframe. Proceeding with available data.")
+                self._logger.warning(f"Requests did not finish on page {self._current_page_number}. Proceeding.")
 
-            current_links = self._get_links()
-            current_link_addresses = set(link.get('attributes', {}).get('href') for link in current_links if
-                                         link.get('attributes', {}).get('href'))
+            card_links = self._get_links()
+            if not card_links:
+                self._logger.info(f"No company card links found on page {self._current_page_number}.")
 
-            new_links = [link for link in current_links if link.get('attributes', {}).get('href') not in visited_links]
-            if new_links:
-                visited_links.update(link.get('attributes', {}).get('href') for link in new_links)
-            else:
-                if not walk_page_number and not new_links:
-                    self._logger.info("No new links found and not walking through pages. Ending parse.")
+            cards_on_this_page = 0
+            for link_node in card_links:
+                if collected_card_count >= self._max_records:
                     break
 
-            if not walk_page_number:
-                for link in new_links:
-                    for attempt in range(3):
-                        try:
-                            self._driver.perform_click(link)
-                        except Exception as e:
-                            self._logger.error(f"Failed to click link {link.get('attributes', {}).get('href')}: {e}")
-                            continue
+                target_link_href = link_node.get('attributes', {}).get('href')
+                if not target_link_href:
+                    continue
 
-                        if self._delay_between_clicks > 0:
-                            time.sleep(self._delay_between_clicks / 1000)
+                try:
+                    self.driver.perform_click(link_node)
+                    if self._delay_between_clicks > 0:
+                        time.sleep(self._delay_between_clicks / 1000)
+                except Exception as e:
+                    self._logger.error(f"Failed to click on company link {target_link_href}: {e}")
+                    continue
 
-                        resp = self.driver.wait_response(self._item_response_pattern, timeout=10)
+                response = self.driver.wait_response(self._item_response_pattern, timeout=15)
+                if not response:
+                    self._logger.error("Did not receive API response for the company card.")
+                    continue
 
-                        if resp and resp.get('status', -1) >= 0:
-                            break
-                        else:
-                            self._logger.warning(
-                                f"Attempt {attempt + 1} failed to get response for link {link.get('attributes', {}).get('href')}. Retrying...")
-                    else:
-                        self._logger.error(
-                            f"Failed to get response after 3 attempts for link {link.get('attributes', {}).get('href')}.")
-                        continue
+                response_body = self.driver.get_response_body(response, timeout=10)
+                if not response_body:
+                    self._logger.error("Response body is empty.")
+                    continue
 
-                    doc = None
-                    if resp and resp.get('status', -1) >= 0:
-                        try:
-                            data_body = self.driver.get_response_body(resp, timeout=10)
-                            if data_body:
-                                doc = json.loads(data_body)
-                            else:
-                                self._logger.error('Response body is empty for link. Skipping position.')
-                        except json.JSONDecodeError:
-                            self._logger.error('Server returned invalid JSON document: "%s", skipping position.',
-                                               data_body)
-                        except Exception as e:
-                            self._logger.error(f"Error processing response body: {e}")
-                    else:
-                        self._logger.error('Response was not received or had an error. Skipping position.')
+                try:
+                    item_data = json.loads(response_body)
+                except json.JSONDecodeError:
+                    self._logger.error("Failed to decode JSON response body.")
+                    continue
 
-                    if doc:
-                        try:
-                            writer.write(doc)
-                            collected_records += 1
-                        except Exception as e:
-                            self._logger.error(f"Error writing record to file: {e}")
-                    else:
-                        self._logger.error('Failed to get document data, skipping position.')
+                processed_item = self._get_item_data_from_response(item_data, target_link_href)
 
-                    if collected_records >= self._max_records:
-                        self._logger.info('Reached maximum allowed records for this URL.')
-                        return
+                if processed_item:
+                    self._collected_card_data.append(processed_item)
+                    cards_on_this_page += 1
+                    collected_card_count += 1
 
-            if self._use_gc and current_page_number % self._gc_pages_interval == 0:
-                self._logger.debug('Running garbage collector.')
-                self.driver.execute_script('"gc" in window && window.gc()')
+                    self._aggregated_data['total_cards'] += 1
+
+                    rating_str = processed_item.get('card_rating', '')
+                    try:
+                        if rating_str:
+                            self._aggregated_data['total_rating_sum'] += float(rating_str)
+                    except (ValueError, TypeError):
+                        pass
+
+                    self._aggregated_data['total_reviews_count'] += processed_item.get('card_reviews_count', 0)
+                    self._aggregated_data['total_positive_reviews'] += processed_item.get('card_reviews_positive', 0)
+                    self._aggregated_data['total_negative_reviews'] += processed_item.get('card_reviews_negative', 0)
+
+                    self._logger.debug(f"Collected detailed data for: {processed_item.get('card_name')}")
+                else:
+                    self._logger.warning("No processed item data extracted for a card.")
+
+            if collected_card_count >= self._max_records:
+                self._logger.info(f'Reached maximum allowed records ({self._max_records}). Stopping parse.')
+                break
+
+            available_pages = self._get_page_navigation_links()
+            next_page_number = self._current_page_number + 1
+
+            if next_page_number in available_pages:
+                self._logger.info(f"Navigating to page {next_page_number}...")
+                navigated_page = self._go_page(next_page_number, available_pages)
+                if navigated_page:
+                    self._current_page_number = navigated_page
+                else:
+                    self._logger.warning(f"Failed to navigate to page {next_page_number}. Stopping pagination.")
+                    break
+            else:
+                self._logger.info(f"No next page found after page {self._current_page_number}. Ending pagination.")
+                break
 
             self.driver.clear_requests()
 
-            next_page_number = current_page_number + 1
+        if self._aggregated_data['total_cards'] > 0:
+            final_rating = round(self._aggregated_data['total_rating_sum'] / self._aggregated_data['total_cards'], 2) if \
+                self._aggregated_data['total_cards'] > 0 and self._aggregated_data['total_rating_sum'] else ''
 
-            if walk_page_number:
-                available_pages = self._get_available_pages()
-                available_pages_ahead = {k: v for k, v in available_pages.items()
-                                         if k > current_page_number}
+            final_record = {
+                'name': self._collected_card_data[0].get('name',
+                                                         'N/A') if self._collected_card_data else self._search_query_name,
+                'rating': final_rating,
+                'reviews_count': self._aggregated_data['total_reviews_count'],
+                'positive_reviews': self._aggregated_data['total_positive_reviews'],
+                'negative_reviews': self._aggregated_data['total_negative_reviews'],
+                'website': self._collected_card_data[0].get('card_website', '') if self._collected_card_data else '',
+                'total_cards_found': self._aggregated_data['total_cards']
+            }
 
-                if available_pages_ahead:
-                    next_page_number = min(available_pages_ahead.keys(), key=lambda n: abs(n - walk_page_number),
-                                           default=current_page_number + 1)
+            row_to_write = {}
+            for key, header in self._data_mapping.items():
+                if key.startswith('aggregated_') and key.replace('aggregated_', '') in final_record:
+                    row_to_write[header] = final_record.get(key.replace('aggregated_', ''))
+                elif key.startswith('card_') and self._collected_card_data:
+                    row_to_write[header] = self._collected_card_data[0].get(key)
+                elif key in final_record:
+                    row_to_write[header] = final_record.get(key)
                 else:
-                    next_page_number = current_page_number + 1
-            else:
-                next_page_number = current_page_number + 1
+                    row_to_write[header] = ''
 
-            self._logger.info(f"Navigating to page {next_page_number}...")
-            navigated_page = self._go_page(next_page_number)
+            try:
+                writer.write(row_to_write)
+                self._logger.info(f"Successfully parsed and wrote aggregated data for: {final_record.get('name')}")
+            except Exception as e:
+                self._logger.error(f"Error writing aggregated data to writer: {e}")
+        else:
+            self._logger.info("No company data was collected.")
 
-            if navigated_page:
-                current_page_number = navigated_page
-            else:
-                self._logger.info("Could not navigate to the next page. Ending parse.")
-                break
+    def _format_phones(self, phones_data: List[Dict[str, Any]]) -> str:
+        if not phones_data:
+            return ""
+        formatted_phones = []
+        for phone_entry in phones_data:
+            phone_number = phone_entry.get('number', '')
+            comment = phone_entry.get('comment', '')
+            full_phone_str = phone_number
+            if comment:
+                full_phone_str += f" ({comment})"
+            formatted_phones.append(full_phone_str)
+        return "; ".join(formatted_phones)
 
-            if walk_page_number and walk_page_number <= current_page_number:
-                self._logger.info(f"Reached desired page {walk_page_number}. Exiting walk mode.")
-                walk_page_number = None
-
-            time.sleep(1)
+    def _format_rubrics(self, rubrics_data: List[Dict[str, Any]]) -> str:
+        if not rubrics_data:
+            return ""
+        formatted_rubrics = []
+        for rubric_entry in rubrics_data:
+            rubric_name = rubric_entry.get('name', '')
+            parent_name = rubric_entry.get('parent_name', '')
+            full_rubric_str = rubric_name
+            if parent_name:
+                full_rubric_str = f"{parent_name} / {rubric_name}"
+            formatted_rubrics.append(full_rubric_str)
+        return "; ".join(formatted_rubrics)
