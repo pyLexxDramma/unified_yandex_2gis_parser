@@ -4,8 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Первоначальная настройка структуры проекта">
+    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Определение стандартных моделей для настройки (src/config/models.py)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,7 +66,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1762926699347</updated>
-      <workItem from="1762926700473" duration="2860000" />
+      <workItem from="1762926700473" duration="3744000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -75,7 +76,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762927729032</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Определение стандартных моделей для настройки (src/config/models.py)">
+      <option name="closed" value="true" />
+      <created>1762929666224</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1762929666224</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -83,6 +92,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Первоначальная настройка структуры проекта" />
-    <option name="LAST_COMMIT_MESSAGE" value="Первоначальная настройка структуры проекта" />
+    <MESSAGE value="Определение стандартных моделей для настройки (src/config/models.py)" />
+    <option name="LAST_COMMIT_MESSAGE" value="Определение стандартных моделей для настройки (src/config/models.py)" />
   </component>
 </project>
