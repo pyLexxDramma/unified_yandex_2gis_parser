@@ -4,9 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Реализация GisParser с использованием PychromeDriver и адаптация логики 2GIS (src/parsers/gis_parser.py)">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/storage/csv_writer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/storage/csv_writer.py" afterDir="false" />
+    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Реализация CSVWriter с логикой последующей обработки (src/storage/csv_writer.py)">
+      <change beforePath="$PROJECT_DIR$/src/parsers/yandex_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/yandex_parser.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,7 +65,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1762926699347</updated>
-      <workItem from="1762926700473" duration="11574000" />
+      <workItem from="1762926700473" duration="12384000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -140,7 +139,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762938690097</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Реализация CSVWriter с логикой последующей обработки (src/storage/csv_writer.py)">
+      <option name="closed" value="true" />
+      <created>1762940119918</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1762940119918</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -156,6 +163,7 @@
     <MESSAGE value="Определение абстрактных базовых классов синтаксического анализа и записи (src/parsers/base_parser.py, src/storage/file_writer.py заполнитель)" />
     <MESSAGE value="Реализация базового средства записи файлов с указанием пути вывода и кодировки (src/storage/file_writer.py)" />
     <MESSAGE value="Реализация GisParser с использованием PychromeDriver и адаптация логики 2GIS (src/parsers/gis_parser.py)" />
-    <option name="LAST_COMMIT_MESSAGE" value="Реализация GisParser с использованием PychromeDriver и адаптация логики 2GIS (src/parsers/gis_parser.py)" />
+    <MESSAGE value="Реализация CSVWriter с логикой последующей обработки (src/storage/csv_writer.py)" />
+    <option name="LAST_COMMIT_MESSAGE" value="Реализация CSVWriter с логикой последующей обработки (src/storage/csv_writer.py)" />
   </component>
 </project>
