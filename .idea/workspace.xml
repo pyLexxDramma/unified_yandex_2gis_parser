@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Определение абстрактных базовых классов синтаксического анализа и записи (src/parsers/base_parser.py, src/storage/file_writer.py заполнитель)">
+    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Реализация базового средства записи файлов с указанием пути вывода и кодировки (src/storage/file_writer.py)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/models.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/storage/file_writer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/storage/file_writer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/parsers/gis_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/gis_parser.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -67,7 +66,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1762926699347</updated>
-      <workItem from="1762926700473" duration="8851000" />
+      <workItem from="1762926700473" duration="10295000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -125,7 +124,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762935906886</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Реализация базового средства записи файлов с указанием пути вывода и кодировки (src/storage/file_writer.py)">
+      <option name="closed" value="true" />
+      <created>1762937040861</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1762937040861</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -139,6 +146,7 @@
     <MESSAGE value="Реализация ChromeDriver с помощью Selenium и webdriver_manager (src/drivers/chrome_driver.py" />
     <MESSAGE value="Реализация PychromeDriver для логики синтаксического анализа 2GIS (src/drivers/pychrome_driver.py)" />
     <MESSAGE value="Определение абстрактных базовых классов синтаксического анализа и записи (src/parsers/base_parser.py, src/storage/file_writer.py заполнитель)" />
-    <option name="LAST_COMMIT_MESSAGE" value="Определение абстрактных базовых классов синтаксического анализа и записи (src/parsers/base_parser.py, src/storage/file_writer.py заполнитель)" />
+    <MESSAGE value="Реализация базового средства записи файлов с указанием пути вывода и кодировки (src/storage/file_writer.py)" />
+    <option name="LAST_COMMIT_MESSAGE" value="Реализация базового средства записи файлов с указанием пути вывода и кодировки (src/storage/file_writer.py)" />
   </component>
 </project>
