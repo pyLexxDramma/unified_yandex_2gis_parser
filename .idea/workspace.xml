@@ -4,10 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Внедрение управление настройками с помощью Pydantic, .env и config.json (src/config/settings.py">
+    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Определение абстрактного базового драйвера для взаимодействия с браузером (src/drivers/base_driver.py)&quot;">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/drivers/base_driver.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/drivers/base_driver.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/drivers/chrome_driver.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/drivers/chrome_driver.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -67,7 +67,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1762926699347</updated>
-      <workItem from="1762926700473" duration="4704000" />
+      <workItem from="1762926700473" duration="5212000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -93,7 +93,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762930715021</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Определение абстрактного базового драйвера для взаимодействия с браузером (src/drivers/base_driver.py)&quot;">
+      <option name="closed" value="true" />
+      <created>1762931686323</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1762931686323</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -103,6 +111,7 @@
     <MESSAGE value="Первоначальная настройка структуры проекта" />
     <MESSAGE value="Определение стандартных моделей для настройки (src/config/models.py)" />
     <MESSAGE value="Внедрение управление настройками с помощью Pydantic, .env и config.json (src/config/settings.py" />
-    <option name="LAST_COMMIT_MESSAGE" value="Внедрение управление настройками с помощью Pydantic, .env и config.json (src/config/settings.py" />
+    <MESSAGE value="Определение абстрактного базового драйвера для взаимодействия с браузером (src/drivers/base_driver.py)&quot;" />
+    <option name="LAST_COMMIT_MESSAGE" value="Определение абстрактного базового драйвера для взаимодействия с браузером (src/drivers/base_driver.py)&quot;" />
   </component>
 </project>

@@ -13,7 +13,6 @@ from .models import AppConfig, ChromeOptions, ParserOptions, WriterOptions, LogO
 
 
 def get_project_root() -> pathlib.Path:
-    """Find the project root directory."""
     current_path = pathlib.Path(__file__).resolve()
     for _ in range(5):
         if (current_path / '.git').exists() or \
@@ -30,7 +29,6 @@ ENV_FILE_PATH = PROJECT_ROOT / ".env"
 
 
 class Settings:
-    """Singleton class to manage application settings."""
     _instance: Optional[Settings] = None
     _config: Optional[AppConfig] = None
 
@@ -42,7 +40,6 @@ class Settings:
 
     @classmethod
     def _load_settings(cls) -> None:
-        """Load settings from .env, config.json and validate them."""
         env_path = find_dotenv()
         if env_path:
             load_dotenv(dotenv_path=env_path)
@@ -75,14 +72,12 @@ class Settings:
 
     @classmethod
     def get_config(cls) -> AppConfig:
-        """Return the application configuration."""
         if cls._config is None:
             cls._load_settings()
         return cls._config
 
     @classmethod
     def get(cls, key: str, default: Any = None) -> Any:
-        """Get a specific configuration value by key (e.g., 'chrome.headless')."""
         if cls._config is None:
             cls._load_settings()
             if cls._config is None:
