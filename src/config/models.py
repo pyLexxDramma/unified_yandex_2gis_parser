@@ -111,6 +111,7 @@ class ParserOptions(BaseModel):
 
 class AppConfig(BaseModel):
     app_name: str = "Unified Parser"
+    project_root: pathlib.Path = Field(default_factory=get_project_root)
     chrome: ChromeOptions = Field(default_factory=ChromeOptions)
     parser: ParserOptions = Field(default_factory=ParserOptions)
     writer: WriterOptions = Field(default_factory=WriterOptions)
