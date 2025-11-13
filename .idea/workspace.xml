@@ -4,10 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Рефакторинг: реализована основная логика синтаксического анализа для 2GIS и Яндекса, настройка веб-приложения Flask с базовым пользовательским интерфейсом и консолидированы соответствующие изменения, в частности, разбиение на страницы, агрегацию данных и первоначальный анализ подробных данных карты.">
+    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Улучшена работа парсеров для сбора подробных данных о карточках, включая отзывы, информацию об ответах (для 2GIS), и включена агрегация. Обновлены GisParser для детального анализа JSON и YandexParser для анализа фрагментов. Включает обновленную логику отображения и агрегирования данных">
+      <change afterPath="$PROJECT_DIR$/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/debug_import.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/parsers/gis_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/gis_parser.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/parsers/yandex_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/yandex_parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/drivers/base_driver.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/drivers/base_driver.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/drivers/pychrome_driver.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/drivers/pychrome_driver.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/parsers/base_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/base_parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/webapp/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/webapp/app.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -18,27 +26,28 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="HTML File" />
+        <option value="Python Script" />
       </list>
     </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "pyLexxDramma"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;pyLexxDramma&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/pyLexxDramma/unified_yandex_2gis_parser.git",
-    "accountId": "5664d523-6e77-4907-bb08-dbed1ea0fa10"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/pyLexxDramma/unified_yandex_2gis_parser.git&quot;,
+    &quot;accountId&quot;: &quot;5664d523-6e77-4907-bb08-dbed1ea0fa10&quot;
   }
-}]]></component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 7
-}]]></component>
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
   <component name="ProjectId" id="35MjBa79bkrtaiycc0sD1cfLd4U" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true">
     <ConfirmationsSetting value="2" id="Add" />
@@ -50,6 +59,7 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "DefaultHtmlFileTemplate": "HTML File",
+    "Python.chrome.exe.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "main",
@@ -77,7 +87,9 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1762926699347</updated>
-      <workItem from="1762926700473" duration="22239000" />
+      <workItem from="1762926700473" duration="25488000" />
+      <workItem from="1763008561956" duration="4307000" />
+      <workItem from="1763012891093" duration="16401000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -199,7 +211,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762951862807</updated>
     </task>
-    <option name="localTasksCounter" value="16" />
+    <task id="LOCAL-00016" summary="Улучшена работа парсеров для сбора подробных данных о карточках, включая отзывы, информацию об ответах (для 2GIS), и включена агрегация. Обновлены GisParser для детального анализа JSON и YandexParser для анализа фрагментов. Включает обновленную логику отображения и агрегирования данных">
+      <option name="closed" value="true" />
+      <created>1762954480961</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1762954480961</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -221,6 +241,10 @@
     <MESSAGE value="Внедрение веб-приложения Flask в качестве точки входа (src/webapp/app.py)" />
     <MESSAGE value="Реализована точка входа в веб-приложение flask и HTML-шаблон (src/webapp/app.py, src/webapp / templates/)" />
     <MESSAGE value="Рефакторинг: реализована основная логика синтаксического анализа для 2GIS и Яндекса, настройка веб-приложения Flask с базовым пользовательским интерфейсом и консолидированы соответствующие изменения, в частности, разбиение на страницы, агрегацию данных и первоначальный анализ подробных данных карты." />
-    <option name="LAST_COMMIT_MESSAGE" value="Рефакторинг: реализована основная логика синтаксического анализа для 2GIS и Яндекса, настройка веб-приложения Flask с базовым пользовательским интерфейсом и консолидированы соответствующие изменения, в частности, разбиение на страницы, агрегацию данных и первоначальный анализ подробных данных карты." />
+    <MESSAGE value="Улучшена работа парсеров для сбора подробных данных о карточках, включая отзывы, информацию об ответах (для 2GIS), и включена агрегация. Обновлены GisParser для детального анализа JSON и YandexParser для анализа фрагментов. Включает обновленную логику отображения и агрегирования данных" />
+    <option name="LAST_COMMIT_MESSAGE" value="Улучшена работа парсеров для сбора подробных данных о карточках, включая отзывы, информацию об ответах (для 2GIS), и включена агрегация. Обновлены GisParser для детального анализа JSON и YandexParser для анализа фрагментов. Включает обновленную логику отображения и агрегирования данных" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/unified_yandex_2gis_parser$chrome_exe.coverage" NAME="chrome.exe Coverage Results" MODIFIED="1763023668517" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>

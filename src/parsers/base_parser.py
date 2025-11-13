@@ -4,7 +4,7 @@ import abc
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.config.settings import Settings, AppConfig
+from src.config.settings import settings
 from src.drivers.base_driver import BaseDriver
 from src.storage.file_writer import FileWriter
 

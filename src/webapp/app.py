@@ -150,10 +150,10 @@ def download_results(filename: str):
 
 
 if __name__ == '__main__':
-    if not app.config['SECRET_KEY'] or app.config['SECRET_KEY'] == 'a_very_secret_key_for_development_only':
+    if not app.config.get('SECRET_KEY') or app.config['SECRET_KEY'] == 'a_very_secret_key_for_development_only': # Добавил .get() для безопасности
         logger.warning("Using default SECRET_KEY. Please set a strong SECRET_KEY in your environment for production.")
         if not os.environ.get('SECRET_KEY'):
             app.config['SECRET_KEY'] = str(uuid.uuid4())
             logger.info(f"Generated a temporary SECRET_KEY: {app.config['SECRET_KEY']}")
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=8080, debug=True)

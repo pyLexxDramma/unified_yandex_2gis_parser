@@ -7,7 +7,7 @@ webdriver-manager
 pygame
 Flask
 ReportLab
-smtplib
-email
 requests
 psutil
+lxml
+beautifulsoup4

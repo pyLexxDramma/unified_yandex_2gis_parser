@@ -1,0 +1,13 @@
+{
+  "chrome": {
+    "headless": true,
+    "disable_images": false
+  },
+  "parser": {
+    "max_records": 50,
+    "delay_between_clicks": 500
+  },
+  "log": {
+    "level": "DEBUG"
+  }
+}
