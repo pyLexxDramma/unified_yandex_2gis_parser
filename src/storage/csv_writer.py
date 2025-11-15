@@ -1,19 +1,22 @@
 from __future__ import annotations
-
 import csv
 import os
 import shutil
 import re
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.storage.file_writer import FileWriter
 from src.config.settings import AppConfig
+from src.config.models import AppConfig as AppConfigModel
+
+logger = logging.getLogger(__name__)
 
 
 class CSVWriter(FileWriter):
-    def __init__(self, settings: AppConfig):
+    def __init__(self, settings: AppConfigModel):
         super().__init__(settings)
+        self.settings = settings
         self._file_path = os.path.join(self.settings.project_root, self.writer_options.csv.output_filename)
         if not self._file_path.lower().endswith('.csv'):
             self._file_path += '.csv'
@@ -63,6 +66,11 @@ class CSVWriter(FileWriter):
                 csv_writer.writerows(data)
         except Exception as e:
             logger.error(f"Error writing temporary data to CSV for empty column check: {e}")
+            if os.path.exists(temp_csv_path):
+                try:
+                    os.remove(temp_csv_path)
+                except Exception as remove_err:
+                    logger.error(f"Failed to remove temporary file: {remove_err}")
             return data, mapping
 
         complex_columns_source = self._complex_mapping.keys()
@@ -86,9 +94,18 @@ class CSVWriter(FileWriter):
                                 complex_columns_count[column_name] += 1
         except Exception as e:
             logger.error(f"Error reading temporary CSV for empty column check: {e}")
+            if os.path.exists(temp_csv_path):
+                try:
+                    os.remove(temp_csv_path)
+                except Exception as remove_err:
+                    logger.error(f"Failed to remove temporary file: {remove_err}")
             return data, mapping
-
-        os.remove(temp_csv_path)
+        finally:
+            if os.path.exists(temp_csv_path):
+                try:
+                    os.remove(temp_csv_path)
+                except Exception as remove_err:
+                    logger.error(f"Failed to remove temporary file: {remove_err}")
 
         new_mapping: Dict[str, str] = {}
         columns_to_keep_in_data = set()
@@ -117,9 +134,9 @@ class CSVWriter(FileWriter):
             processed_data.append(new_row)
 
         final_mapping: Dict[str, str] = {}
-        for original_field, csv_header in mapping.items():
-            if csv_header in columns_to_keep_in_data:
-                final_mapping[original_field] = csv_header
+        for original_field, header in mapping.items():
+            if header in columns_to_keep_in_data:
+                final_mapping[original_field] = header
 
         renamed_fields_map = {}
         for source_field, header in mapping.items():
@@ -160,7 +177,7 @@ class CSVWriter(FileWriter):
                 unique_data.append(row)
         return unique_data
 
-    def __enter__(self) -> CSVWriter:
+    def __enter__(self) -> 'CSVWriter':
         try:
             if not self._data_mapping and self._temp_data:
                 self._data_mapping = {k: k for k in self._temp_data[0].keys()}
@@ -195,4 +212,3 @@ class CSVWriter(FileWriter):
         if self._file:
             self._file.close()
             logger.info(f"Closed CSV file: {self._file_path}")
-        pass

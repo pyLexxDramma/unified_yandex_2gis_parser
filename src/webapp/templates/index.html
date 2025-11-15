@@ -1,91 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unified Parser</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 20px;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: auto;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        input[type="text"], select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        button:hover {
-            background-color: #45a049;
-        }
-
-        .error {
-            color: red;
-            font-weight: bold;
-        }
-
-        .success {
-            color: green;
-            font-weight: bold;
-        }
-    </style>
+    <title>Web Scraper</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <div class="container">
-    <h1>Unified Parser</h1>
-    <p>Enter company details to start parsing.</p>
+    <h1>Web Scraper</h1>
+    <form action="/start_parsing" method="post">
+        <label for="parser_name">Parser:</label>
+        <select id="parser_name" name="parser_name" required>
+            <option value="gis">2GIS</option>
+            <option value="yandex">Yandex Maps</option>
+        </select><br><br>
 
-    {% if error %}
-    <p class="error">{{ error }}</p>
-    {% endif %}
-    {% if success %}
-    <p class="success">{{ success }}</p>
-    {% endif %}
+        <label for="url">URL:</label>
+        <input type="text" id="url" name="url" required><br><br>
 
-    <form action="{{ url_for('start_parsing') }}" method="post">
-        <div class="form-group">
-            <label for="company_name">Company Name:</label>
-            <input type="text" id="company_name" name="company_name" required>
-        </div>
-        <div class="form-group">
-            <label for="company_site">Company Website:</label>
-            <input type="text" id="company_site" name="company_site" required>
-        </div>
-        <div class="form-group">
-            <label for="source">Source:</label>
-            <select id="source" name="source" required>
-                <option value="2gis">2GIS</option>
-                <option value="yandex">Yandex Maps</option>
-            </select>
-        </div>
+        <label for="output_filename">Output Filename (e.g., output.csv):</label>
+        <input type="text" id="output_filename" name="output_filename" value="output.csv" required><br><br>
+
         <button type="submit">Start Parsing</button>
     </form>
 </div>

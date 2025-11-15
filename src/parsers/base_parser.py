@@ -1,10 +1,9 @@
 from __future__ import annotations
-
 import abc
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.config.settings import settings
+from src.config.settings import AppConfig
 from src.drivers.base_driver import BaseDriver
 from src.storage.file_writer import FileWriter
 
@@ -22,7 +21,7 @@ class BaseWriter(abc.ABC):
     def write(self, data: Any) -> None:
         pass
 
-    def __enter__(self) -> BaseWriter:
+    def __enter__(self) -> 'BaseWriter':
         raise NotImplementedError
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -41,7 +40,7 @@ class BaseParser(abc.ABC):
         self._collected_items: List[Any] = []
 
     @abc.abstractmethod
-    def parse(self, writer: BaseWriter) -> None:
+    def parse(self, url: str) -> List[Dict[str, Any]]:
         pass
 
     @staticmethod
@@ -52,7 +51,7 @@ class BaseParser(abc.ABC):
     def get_config(self, key: str, default: Any = None) -> Any:
         return self.settings.get(key, default)
 
-    def __enter__(self) -> BaseParser:
+    def __enter__(self) -> 'BaseParser':
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -61,4 +60,4 @@ class BaseParser(abc.ABC):
     def __repr__(self) -> str:
         classname = self.__class__.__name__
         return (f'{classname}(driver={self.driver!r}, '
-                f'settings={self.settings.app_name!r})')
+                f'settings={self.settings!r})')

@@ -1,13 +1,53 @@
 {
+  "app_name": "Unified Parser Configuration",
+  "project_root": null,
+  "config_file": null,
+  "env_file": null,
+  "root_directory": "/",
+  "environment": "development",
+  "log_level": "info",
   "chrome": {
-    "headless": true,
-    "disable_images": false
+    "headless": false,
+    "chromedriver_path": "C:/Users/lexxd/Downloads/chromedriver_win32/chromedriver.exe",
+    "silent_browser": true,
+    "binary_path": null,
+    "start_maximized": false,
+    "disable_images": true,
+    "memory_limit": 1024
   },
   "parser": {
-    "max_records": 50,
-    "delay_between_clicks": 500
+    "retries": 3,
+    "timeout": 10.0,
+    "skip_404_response": true,
+    "delay_between_clicks": 0,
+    "max_records": 1000,
+    "use_gc": false,
+    "gc_pages_interval": 10,
+    "yandex_captcha_wait": 20,
+    "yandex_reviews_scroll_step": 500,
+    "yandex_reviews_scroll_max_iter": 100,
+    "yandex_reviews_scroll_min_iter": 30
+  },
+  "writer": {
+    "encoding": "utf-8-sig",
+    "verbose": true,
+    "format": "csv",
+    "csv": {
+      "add_rubrics": true,
+      "add_comments": true,
+      "columns_per_entity": 3,
+      "remove_empty_columns": true,
+      "remove_duplicates": true,
+      "join_char": "; ",
+      "output_filename": "output.csv"
+    },
+    "output_dir": "./output"
   },
   "log": {
-    "level": "DEBUG"
+    "gui_format": "%(asctime)s.%(msecs)03d | %(message)s",
+    "cli_format": "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(message)s",
+    "gui_datefmt": "%H:%M:%S",
+    "cli_datefmt": "%d/%m/%Y %H:%M:%S",
+    "level": "info"
   }
 }

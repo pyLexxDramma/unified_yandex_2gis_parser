@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import abc
 import logging
 import os
@@ -20,7 +19,7 @@ class FileWriter(abc.ABC):
         self._output_filename = self.get_output_filename()
         if not self._output_filename:
             raise ValueError("Output filename is not specified in configuration.")
-        project_root = getattr(settings, 'PROJECT_ROOT', os.getcwd())
+        project_root = getattr(settings, 'project_root', os.getcwd())
         self._file_path = os.path.join(project_root, self._output_filename)
         output_dir = os.path.dirname(self._file_path)
         if output_dir and not os.path.exists(output_dir):
@@ -37,7 +36,7 @@ class FileWriter(abc.ABC):
     def write(self, data: Any) -> None:
         pass
 
-    def __enter__(self) -> FileWriter:
+    def __enter__(self) -> 'FileWriter':
         self.encoding = self.writer_options.encoding
         try:
             self._file = open(self._file_path, 'w', encoding=self.encoding, newline='')

@@ -1,60 +1,38 @@
 from __future__ import annotations
 
-import json
-import os
-import pathlib
-from typing import Any, Dict, List, Optional, Union, Tuple
+from pydantic import BaseModel
+from typing import Literal, Optional
 
-from dotenv import load_dotenv, find_dotenv
-from pydantic import ValidationError
+class ChromeSettings(BaseModel):
+    headless: bool = False
+    from __future__ import annotations
+    from typing import Literal
+    from pydantic import BaseModel, Field
+    import pathlib
 
-from .models import AppConfig, ChromeOptions, ParserOptions, WriterOptions, LogOptions
+    class ChromeSettings(BaseModel):
+        headless: bool = False
+        chromedriver_path: str = "C:/Users/lexxd/Downloads/chromedriver_win32/chromedriver.exe"  # Обновленный путь
+        silent_browser: bool = True
 
+    class ParserOptions(BaseModel):
+        retries: int = 3
+        timeout: float = 10.0
 
-def load_settings(
-        config_file: Optional[str] = None,
-        env_file: Optional[str] = None
-) -> AppConfig:
-    project_root = pathlib.Path(__file__).resolve().parent.parent.parent
+    class WriterOptions(BaseModel):
+        output_dir: str = "./output"
+        format: Literal["csv", "json"] = "csv"
 
-    if config_file is None:
-        config_file = project_root / "config.json"
-    if env_file is None:
-        env_file = project_root / ".env"
+    class AppConfig(BaseModel):
+        root_directory: str = "/"
+        environment: Literal["development", "production"] = "development"
+        log_level: Literal["debug", "info", "warning", "error"] = "info"
 
-    settings_data: Dict[str, Any] = {}
+    class Settings(BaseModel):
+        chrome: ChromeSettings = ChromeSettings()
+        parser: ParserOptions = ParserOptions()
+        writer: WriterOptions = WriterOptions()
+        app_config: AppConfig = AppConfig()
+        project_root: str = "."
 
-    try:
-        load_dotenv(dotenv_path=env_file)
-    except Exception as e:
-        print(f"Could not load .env file from {env_file}: {e}")
-
-    if config_file.exists():
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                settings_data = json.load(f)
-        except FileNotFoundError:
-            print(f"Config file not found at {config_file}. Using default settings.")
-        except json.JSONDecodeError:
-            print(f"Failed to decode JSON from config file: {config_file}")
-            settings_data = {}
-        except Exception as e:
-            print(f"Error reading config file {config_file}: {e}")
-            settings_data = {}
-    else:
-        print(f"Config file not found at {config_file}. Using default settings.")
-
-    try:
-        app_config = AppConfig.model_validate(settings_data)
-        return app_config
-    except ValidationError as e:
-        print(f"Settings validation error: {e}")
-        raise
-
-
-try:
-    settings = load_settings()
-except Exception as e:
-    print(f"Failed to initialize settings: {e}")
-    settings = AppConfig()
-    print("Using default settings due to initialization error.")
+    settings = Settings()
