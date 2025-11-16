@@ -3,61 +3,57 @@ import abc
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from selenium.webdriver.remote.webelement import WebElement
 from src.config.settings import AppConfig
-from src.drivers.base_driver import BaseDriver
-from src.storage.file_writer import FileWriter
 
 logger = logging.getLogger(__name__)
-
-
-class BaseWriter(abc.ABC):
-    def __init__(self, settings: AppConfig):
-        self.settings = settings
-        self._file = None
-        self._file_path: Optional[str] = None
-        self._wrote_count: int = 0
-
-    @abc.abstractmethod
-    def write(self, data: Any) -> None:
-        pass
-
-    def __enter__(self) -> 'BaseWriter':
-        raise NotImplementedError
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        if self._file:
-            self._file.close()
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} object>"
 
 
 class BaseParser(abc.ABC):
     def __init__(self, driver: BaseDriver, settings: AppConfig):
         self.driver = driver
         self.settings = settings
-        self._logger = logger
-        self._collected_items: List[Any] = []
+        self._driver_options = settings.parser
+
+    @abc.abstractmethod
+    def get_url_pattern(self) -> str:
+        pass
 
     @abc.abstractmethod
     def parse(self, url: str) -> List[Dict[str, Any]]:
         pass
 
-    @staticmethod
-    @abc.abstractmethod
-    def get_url_pattern() -> str:
-        pass
+    def _wait_for_requests_finished(self, timeout: int = 10) -> bool:
+        try:
+            if hasattr(self.driver, 'tab') and hasattr(self.driver.tab, 'set_default_timeout'):
+                self.driver.tab.set_default_timeout(timeout)
 
-    def get_config(self, key: str, default: Any = None) -> Any:
-        return self.settings.get(key, default)
+            if hasattr(self.driver, 'execute_script'):
+                script_result = self.driver.execute_script(
+                    'return typeof window.openHTTPs === "undefined" ? 0 : window.openHTTPs;')
+                return script_result == 0
+            else:
+                logger.warning("Driver does not support execute_script for request checking.")
+                return True
+        except Exception as e:
+            logger.error(f"Error waiting for requests to finish: {e}", exc_info=True)
+            return True
 
-    def __enter__(self) -> 'BaseParser':
-        return self
+    def _get_links_from_page(self, locator: Tuple[str, str] = ('css selector', 'a')) -> List[Dict[str, Any]]:
+        try:
+            return self.driver.get_elements_by_locator(locator)
+        except Exception as e:
+            logger.error(f"Error getting links by locator {locator}: {e}", exc_info=True)
+            return []
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        pass
+    def _get_response_body_from_url(self, url_pattern: str, timeout: int = 10) -> Optional[str]:
+        response = self.driver.wait_response(url_pattern, timeout=timeout)
+        if response:
+            return self.driver.get_response_body(response)
+        return None
 
-    def __repr__(self) -> str:
-        classname = self.__class__.__name__
-        return (f'{classname}(driver={self.driver!r}, '
-                f'settings={self.settings!r})')
+    def _get_url_with_query_params(self, base_url: str, query_params: Dict[str, str]) -> str:
+        from urllib.parse import urlencode, urljoin
+
+        encoded_params = urlencode(query_params)
+        return urljoin(base_url, f"?{encoded_params}")

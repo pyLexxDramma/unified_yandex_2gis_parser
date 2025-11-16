@@ -1,27 +1,70 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Web Scraper</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Scraper - Parser</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}"> <!-- Теперь эта строка должна работать -->
+    <style>
+        /* Инлайновые стили остаются как запасной вариант, но CSS должен загрузиться */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { background-color: #ffffff; padding: 30px 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); text-align: center; max-width: 600px; width: 100%; margin-top: 50px; }
+        h1 { color: #2c3e50; margin-bottom: 25px; font-size: 2em; font-weight: 600; }
+        .form-group { margin-bottom: 20px; text-align: left; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; color: #555; }
+        input[type="text"], input[type="email"], select, button { width: 100%; padding: 12px 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 1em; }
+        input[type="text"]:focus, input[type="email"]:focus, select:focus { border-color: #3498db; outline: none; box-shadow: 0 0 5px rgba(52, 152, 219, 0.3); }
+        button { background-color: #3498db; color: white; border: none; cursor: pointer; font-weight: bold; transition: background-color 0.3s ease; }
+        button:hover { background-color: #2980b9; }
+        .error-message, .success-message { margin-top: 15px; font-weight: bold; padding: 10px; border-radius: 5px; }
+        .error-message { color: #e74c3c; background-color: #fbd5d2; border: 1px solid #e74c3c; }
+        .success-message { color: #2ecc71; background-color: #d4f8e1; border: 1px solid #2ecc71; }
+    </style>
 </head>
 <body>
-<div class="container">
-    <h1>Web Scraper</h1>
-    <form action="/start_parsing" method="post">
-        <label for="parser_name">Parser:</label>
-        <select id="parser_name" name="parser_name" required>
-            <option value="gis">2GIS</option>
-            <option value="yandex">Yandex Maps</option>
-        </select><br><br>
+    <div class="container">
+        <h1>Web Scraper</h1>
 
-        <label for="url">URL:</label>
-        <input type="text" id="url" name="url" required><br><br>
+        {% if error %}
+            <div class="error-message">{{ error }}</div>
+        {% endif %}
+        {% if success %}
+            <div class="success-message">{{ success }}</div>
+        {% endif %}
 
-        <label for="output_filename">Output Filename (e.g., output.csv):</label>
-        <input type="text" id="output_filename" name="output_filename" value="output.csv" required><br><br>
+        <form id="parserForm" action="/start_parsing" method="post">
 
-        <button type="submit">Start Parsing</button>
-    </form>
-</div>
+            <div class="form-group">
+                <label for="company_name">Введите название компании:</label>
+                <input type="text" id="company_name" name="company_name" placeholder="Например: ООО Ромашка" required>
+            </div>
+
+            <div class="form-group">
+                <label for="company_site">Введите сайт компании (для точной идентификации):</label>
+                <input type="text" id="company_site" name="company_site" placeholder="Например: romashka.ru" required>
+            </div>
+
+            <div class="form-group">
+                <label for="source">Выберите источник:</label>
+                <select id="source" name="source" required>
+                    <option value="">-- Выберите --</option>
+                    <option value="2gis">2GIS</option>
+                    <option value="yandex">Yandex Maps</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Ваш email (для уведомлений):</label>
+                <input type="email" id="email" name="email" placeholder="например: user@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="output_filename">Имя файла отчета (например, company_report.csv):</label>
+                <input type="text" id="output_filename" name="output_filename" placeholder="report.csv" required>
+            </div>
+
+            <button type="submit" id="submitButton">Поехали!</button>
+        </form>
+    </div>
 </body>
 </html>

@@ -2,123 +2,88 @@ from __future__ import annotations
 import abc
 import logging
 from typing import Any, Dict, List, Optional, Tuple
+from selenium.webdriver.remote.webelement import WebElement
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-DOMNode = Dict[str, Any]
+
+class DOMNode:
+    def __init__(self, element_type: str, attributes: dict = {}):
+        self.element_type = element_type
+        self.attributes = attributes
+
+    def add_attribute(self, key: str, value: str):
+        self.attributes[key] = value
+
+    def remove_attribute(self, key: str):
+        del self.attributes[key]
+
+    def has_attribute(self, key: str) -> bool:
+        return key in self.attributes
 
 
 class BaseDriver(abc.ABC):
-    def __init__(self):
-        self.driver = None
-        self.tab = None
-        self._is_running = False
+    @abc.abstractmethod
+    def wait_response(self, url_pattern: str, timeout: int = 10) -> Optional[Any]: pass
 
     @abc.abstractmethod
-    def start(self) -> None:
-        self._is_running = True
-        logger.info(f"{self.__class__.__name__} started.")
+    def get_response_body(self, response: Any) -> Optional[str]: pass
 
     @abc.abstractmethod
-    def stop(self) -> None:
-        if self._is_running:
-            self._is_running = False
-            logger.info(f"{self.__class__.__name__} stopped.")
+    def set_default_timeout(self, timeout: int): pass
 
     @abc.abstractmethod
-    def navigate(self, url: str, referer: Optional[str] = None, timeout: int = 60) -> None:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
+    def execute_script(self, script: str) -> Any: pass
 
     @abc.abstractmethod
-    def get_page_source(self) -> str:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
+    def get_elements_by_locator(self, locator: Tuple[str, str]) -> List[WebElement]: pass
+
+
+class BaseParser(abc.ABC):
+    def __init__(self, driver: BaseDriver, settings: AppConfig):
+        self.driver = driver
+        self.settings = settings
+        self._driver_options = settings.parser
+
+    @abc.abstractmethod
+    def get_url_pattern(self) -> str:
         pass
 
     @abc.abstractmethod
-    def execute_script(self, script: str, *args) -> Any:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
+    def parse(self, url: str) -> Dict[str, Any]:
         pass
 
-    @abc.abstractmethod
-    def perform_click(self, element: Any) -> None:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
+    def _wait_for_requests_finished(self, timeout: int = 10) -> bool:
+        try:
+            if hasattr(self.driver, 'tab') and hasattr(self.driver.tab, 'set_default_timeout'):
+                self.driver.tab.set_default_timeout(timeout)
 
-    @abc.abstractmethod
-    def wait_for_url(self, url_pattern: str, timeout: int = 30) -> bool:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
+            if hasattr(self.driver, 'execute_script'):
+                script_result = self.driver.execute_script(
+                    'return typeof window.openHTTPs === "undefined" ? 0 : window.openHTTPs;')
+                return script_result == 0
+            else:
+                logger.warning("Driver does not support execute_script for request checking.")
+                return True
+        except Exception as e:
+            logger.error(f"Error waiting for requests to finish: {e}", exc_info=True)
+            return True
 
-    @abc.abstractmethod
-    def wait_for_element(self, locator: Tuple[str, str], timeout: int = 30) -> Any:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
+    def _get_links_from_page(self, locator: Tuple[str, str] = ('css selector', 'a')) -> List[Dict[str, Any]]:
+        try:
+            return self.driver.get_elements_by_locator(locator)
+        except Exception as e:
+            logger.error(f"Error getting links by locator {locator}: {e}", exc_info=True)
+            return []
 
-    @abc.abstractmethod
-    def get_element_by_locator(self, locator: Tuple[str, str]) -> Any:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
+    def _get_response_body_from_url(self, url_pattern: str, timeout: int = 10) -> Optional[str]:
+        response = self.driver.wait_response(url_pattern, timeout=timeout)
+        if response:
+            return self.driver.get_response_body(response)
+        return None
 
-    @abc.abstractmethod
-    def get_elements_by_locator(self, locator: Tuple[str, str]) -> List[Any]:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
-
-    @abc.abstractmethod
-    def get_responses(self, url_pattern: Optional[str] = None, timeout: int = 10) -> List[Dict[str, Any]]:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
-
-    @abc.abstractmethod
-    def wait_response(self, url_pattern: str, timeout: int = 10) -> Optional[Dict[str, Any]]:
-
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
-
-    @abc.abstractmethod
-    def get_response_body(self, response: Dict[str, Any], timeout: int = 10) -> Optional[str]:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
-
-    @abc.abstractmethod
-    def add_blocked_requests(self, urls: List[str]) -> None:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
-
-    @abc.abstractmethod
-    def add_start_script(self, script: str) -> None:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
-
-    @abc.abstractmethod
-    def clear_requests(self) -> None:
-        if not self._is_running:
-            raise RuntimeError(f"{self.__class__.__name__} is not running.")
-        pass
-
-    def __enter__(self) -> BaseDriver:
-        self.start()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.stop()
-
-    def __del__(self):
-        self.stop()
-
-    def __repr__(self) -> str:
-        status = "running" if self._is_running else "stopped"
-        return f"<{self.__class__.__name__} {status}>"
+    def _get_url_with_query_params(self, base_url: str, query_params: Dict[str, str]) -> str:
+        from urllib.parse import urlencode, urljoin
+        encoded_params = urlencode(query_params)
+        return urljoin(base_url, f"?{encoded_params}")
