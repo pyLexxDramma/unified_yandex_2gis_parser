@@ -29,7 +29,7 @@ async def test_parser(parser_name: str, url: str, output_filename: str):
             raise ValueError(f"Unknown parser: {parser_name}")
 
         writer = CSVWriter(app_config)
-        writer._output_filename = output_filename  # Override default filename
+        writer._output_filename = output_filename
 
         logger.info(f"Starting manual test for {parser_name} with URL: {url}")
 

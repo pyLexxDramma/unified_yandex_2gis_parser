@@ -1,7 +1,6 @@
 from __future__ import annotations
 import json
 import re
-import logging
 import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Tuple
@@ -92,16 +91,20 @@ class YandexParser(BaseParser):
 
     def _get_card_snippet_data(self, card_element: Tag) -> Optional[Dict[str, Any]]:
         try:
-            name_element = card_element.select_one('h1.card-title-view__title')
+            name_element = card_element.select_one(
+                'h1.card-title-view__title, .search-business-snippet-view__title')
             name = name_element.get_text(strip=True) if name_element else ''
 
-            address_element = card_element.select_one('div.business-contacts-view__address-link')
+            address_element = card_element.select_one(
+                'div.business-contacts-view__address-link, .search-business-snippet-view__address')
             address = address_element.get_text(strip=True) if address_element else ''
 
-            rating_element = card_element.select_one('span.business-rating-badge-view__rating-text')
+            rating_element = card_element.select_one(
+                'span.business-rating-badge-view__rating-text, .search-business-snippet-view__rating-text')
             rating = rating_element.get_text(strip=True) if rating_element else ''
 
-            reviews_element = card_element.select_one('a.business-review-view__rating')
+            reviews_element = card_element.select_one(
+                'a.business-review-view__rating, .search-business-snippet-view__link-reviews')
             reviews_count_text = reviews_element.get_text(strip=True) if reviews_element else ''
             reviews_count = 0
             if reviews_count_text:
@@ -149,7 +152,8 @@ class YandexParser(BaseParser):
 
         reviews_count_total = 0
         try:
-            count_elements = soup_content.select('div.tabs-select-view__counter')
+            count_elements = soup_content.select(
+                'div.tabs-select-view__counter, .search-business-snippet-view__link-reviews')
             if count_elements:
                 reviews_count_text = count_elements[-1].get_text(strip=True)
                 match = re.search(r'(\d+)', reviews_count_text)
@@ -181,7 +185,8 @@ class YandexParser(BaseParser):
                 page_source, soup_content = self._get_page_source_and_soup()
 
                 current_reviews_count = 0
-                count_elements = soup_content.select('div.tabs-select-view__counter')
+                count_elements = soup_content.select(
+                    'div.tabs-select-view__counter, .search-business-snippet-view__link-reviews')
                 if count_elements:
                     reviews_count_text = count_elements[-1].get_text(strip=True)
                     match = re.search(r'(\d+)', reviews_count_text)
@@ -200,10 +205,11 @@ class YandexParser(BaseParser):
             logger.warning(f"Scroll iterations ({scroll_iterations}) less than minimum ({min_scroll_iterations}).")
 
         try:
-            review_cards = soup_content.select('div.review-card-view')
+            review_cards = soup_content.select('div.review-card-view, .review-item-view')
             for card in review_cards:
                 try:
-                    rating_element = card.select_one('span.business-rating-badge-view__rating-text')
+                    rating_element = card.select_one(
+                        'span.business-rating-badge-view__rating-text, .review-item-view__rating-text')
                     rating_text = rating_element.get_text(strip=True) if rating_element else "0"
                     rating_value = float(rating_text) if rating_text.replace('.', '', 1).isdigit() else 0.0
 
@@ -214,7 +220,8 @@ class YandexParser(BaseParser):
                     elif rating_value < 3.0:
                         negative = 1
 
-                    review_text_element = card.select_one('div.business-review-view__body-text')
+                    review_text_element = card.select_one(
+                        'div.business-review-view__body-text, .review-item-view__comment-text')
                     review_text = review_text_element.get_text(strip=True) if review_text_element else ""
 
                     reviews_info['details'].append({
@@ -249,10 +256,11 @@ class YandexParser(BaseParser):
 
             try:
                 page_source, soup = self._get_page_source_and_soup()
-                cards_on_page = soup.select('div.card-view, div.search-business-snippet-view')
+                cards_on_page = soup.select(
+                    'div.card-view, div.search-business-snippet-view, div.catalogue-snippet-view')
 
                 if not cards_on_page:
-                    logger.info("No cards found on this page. Stopping.")
+                    logger.info(f"No cards found on this page for URL: {search_query_url}. Stopping.")
                     break
 
                 for card_element in cards_on_page:
@@ -263,7 +271,7 @@ class YandexParser(BaseParser):
                     if card_snippet and card_snippet.get('card_name'):
                         try:
                             card_link_element = card_element.select_one(
-                                'a.card-view__link, a.search-business-snippet-view__title')
+                                'a.card-view__link, a.search-business-snippet-view__title, a.catalogue-snippet-view__title')
                             card_url = card_link_element.get('href') if card_link_element else None
 
                             if card_url:
@@ -274,13 +282,14 @@ class YandexParser(BaseParser):
                                     continue
                                 processed_urls.add(card_url)
 
+                                logger.info(f"Navigating to card detail page: {card_url}")
                                 self.driver.navigate(card_url)
                                 self.check_captcha()
                                 card_details_soup = BeautifulSoup(self.driver.get_page_source(), "lxml")
 
-                                card_name_detail = card_details_soup.select_one('h1.card-title-view__title')
-                                card_snippet['card_name'] = card_name_detail.get_text(
-                                    strip=True) if card_name_detail else card_snippet['card_name']
+                                name_detail = card_details_soup.select_one('h1.card-title-view__title')
+                                card_snippet['card_name'] = name_detail.get_text(strip=True) if name_detail else \
+                                    card_snippet['card_name']
 
                                 address_detail = card_details_soup.select_one(
                                     'div.business-contacts-view__address-link')
@@ -292,7 +301,8 @@ class YandexParser(BaseParser):
                                 card_snippet['card_rating'] = rating_detail.get_text(strip=True) if rating_detail else \
                                     card_snippet['card_rating']
 
-                                website_detail = card_details_soup.select_one('a[itemprop="url"]')
+                                website_detail = card_details_soup.select_one(
+                                    'a[itemprop="url"], .business-website-view__link')
                                 card_snippet['card_website'] = website_detail.get('href') if website_detail else \
                                     card_snippet['card_website']
 
@@ -303,11 +313,35 @@ class YandexParser(BaseParser):
                                 card_snippet['card_rubrics'] = "; ".join(
                                     [r.get_text(strip=True) for r in rubrics_detail]) if rubrics_detail else ""
 
+                                response_status_element = card_details_soup.select_one(
+                                    '.business-header-view__quick-response-badge')
+                                card_snippet['card_response_status'] = response_status_element.get_text(
+                                    strip=True) if response_status_element else "UNKNOWN"
+
+                                avg_response_time_element = card_details_soup.select_one(
+                                    '.business-header-view__avg-response-time')
+                                avg_response_time_text = avg_response_time_element.get_text(
+                                    strip=True) if avg_response_time_element else ""
+                                if "час" in avg_response_time_text:
+                                    match = re.search(r'(\d+(\.\d+)?)\s*час', avg_response_time_text)
+                                    if match:
+                                        hours = float(match.group(1))
+                                        card_snippet['card_avg_response_time'] = round(hours / 24, 2)
+                                elif "день" in avg_response_time_text:
+                                    match = re.search(r'(\d+(\.\d+)?)\s*день', avg_response_time_text)
+                                    if match:
+                                        card_snippet['card_avg_response_time'] = float(match.group(1))
+                                else:
+                                    card_snippet['card_avg_response_time'] = ""
+
                                 reviews_data = self._get_card_reviews_info()
                                 card_snippet['card_reviews_count'] = reviews_data.get('reviews_count', 0)
                                 card_snippet['card_reviews_positive'] = reviews_data.get('positive_reviews', 0)
                                 card_snippet['card_reviews_negative'] = reviews_data.get('negative_reviews', 0)
-                                card_snippet['card_reviews_texts'] = "; ".join(reviews_data.get('texts', []))
+                                card_snippet['card_reviews_texts'] = "; ".join(reviews_data.get('texts',
+                                                                                                []))
+
+                                card_snippet['detailed_reviews'] = reviews_data.get('details', [])
 
                                 try:
                                     card_rating_float = float(card_snippet['card_rating']) if isinstance(
@@ -321,15 +355,19 @@ class YandexParser(BaseParser):
                                     self._aggregated_data['total_negative_reviews'] += card_snippet[
                                         'card_reviews_negative']
 
-                                    self._aggregated_data['total_answered_count'] += 1 if card_snippet.get(
-                                        'card_response_status', 'UNKNOWN') != 'UNKNOWN' else 0
-                                    self._aggregated_data['total_response_time_sum_days'] += 0.0
+                                    if card_snippet.get('card_response_status') != 'UNKNOWN':
+                                        self._aggregated_data['total_answered_count'] += 1
+                                    if card_snippet.get('card_avg_response_time'):
+                                        try:
+                                            response_time_days = float(card_snippet['card_avg_response_time'])
+                                            self._aggregated_data['total_response_time_sum_days'] += response_time_days
+                                        except (ValueError, TypeError):
+                                            logger.warning(
+                                                f"Could not convert response time to float for card '{card_snippet.get('card_name', 'Unknown')}': {card_snippet.get('card_avg_response_time')}")
 
                                 except (ValueError, TypeError) as e:
                                     logger.warning(
                                         f"Could not parse rating or other data for aggregation for card '{card_snippet.get('card_name', 'Unknown')}': {e}")
-
-                                card_snippet['detailed_reviews'] = reviews_data.get('details', [])
 
                                 self._collected_card_data.append(card_snippet)
                             else:
@@ -337,7 +375,8 @@ class YandexParser(BaseParser):
                                     f"Card link not found or href is empty for card snippet: {card_snippet.get('card_name', 'Unknown')}")
                         except Exception as e:
                             logger.warning(
-                                f"Could not fully process card: {card_snippet.get('card_name', 'Unknown')}. Error: {e}")
+                                f"Could not fully process card: {card_snippet.get('card_name', 'Unknown')}. Error: {e}",
+                                exc_info=True)
                     else:
                         logger.warning(
                             f"Skipping card snippet due to missing name or basic data: {card_element.get_text(strip=True)[:50]}...")
@@ -360,15 +399,29 @@ class YandexParser(BaseParser):
                     logger.info("No next page button found or no href. Stopping pagination.")
                     break
             except Exception as e:
-                logger.error(f"Error processing Yandex Maps page: {e}", exc_info=True)
+                logger.error(f"Error processing Yandex Maps page: {e}",
+                             exc_info=True)
                 break
 
         return self._collected_card_data
 
     def parse(self, url: str) -> Dict[str, Any]:
         self._url = url
-        self._search_query_name = url.split('text=')[-1].split('&')[0] if 'text=' in url else "YandexMapsSearch"
-        logger.info(f"Starting Yandex Parser for URL: {url}")
+        parsed_url = urllib.parse.urlparse(url)
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+
+        search_text_param = query_params.get('text')
+        if search_text_param:
+            search_text_value = search_text_param[0]
+            if ',' in search_text_value:
+                parts = search_text_value.split(',', 1)
+                self._search_query_name = parts[1].strip()
+            else:
+                self._search_query_name = search_text_value
+        else:
+            self._search_query_name = "YandexMapsSearch"
+
+        logger.info(f"Starting Yandex Parser for URL: {url}. Search query name extracted as: {self._search_query_name}")
 
         collected_cards_data = self._parse_cards(url)
 
@@ -393,10 +446,18 @@ class YandexParser(BaseParser):
                 [card.get('card_reviews_negative', 0) for card in collected_cards_data])
             self._aggregated_data['total_answered_count'] = sum(
                 [1 for card in collected_cards_data if card.get('card_response_status', 'UNKNOWN') != 'UNKNOWN'])
-            self._aggregated_data['total_response_time_sum_days'] = sum([float(
-                card.get('card_avg_response_time', 0)) if isinstance(card.get('card_avg_response_time'),
-                                                                     str) and card.get(
-                'card_avg_response_time').replace('.', '', 1).isdigit() else 0.0 for card in collected_cards_data])
+
+            total_response_time_days = 0.0
+            for card in collected_cards_data:
+                response_time_str = card.get('card_avg_response_time', '')
+                if response_time_str:
+                    try:
+                        response_time_days += float(response_time_str)
+                    except (ValueError, TypeError):
+                        logger.warning(
+                            f"Could not convert response time to float for card '{card.get('card_name', 'Unknown')}': {response_time_str}")
+            self._aggregated_data['total_response_time_sum_days'] = total_response_time_days
+
 
         else:
             avg_rating = 0.0
@@ -411,7 +472,7 @@ class YandexParser(BaseParser):
             'aggregated_answered_count': self._aggregated_data['total_answered_count'],
             'aggregated_avg_response_time': round(self._aggregated_data['total_response_time_sum_days'] / total_cards,
                                                   2) if total_cards > 0 and self._aggregated_data[
-                'total_response_time_sum_days'] else 0.0,
+                'total_response_time_sum_days'] > 0 else 0.0,
         }
 
         return {'aggregated_info': aggregated_info, 'cards_data': collected_cards_data}
