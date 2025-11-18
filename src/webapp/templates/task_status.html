@@ -1,30 +1,203 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Task Status</title>
+    <meta charset="UTF-8">
+    <title>Статус задачи</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/task_status.js" defer></script>
 </head>
 <body>
-<div class="container">
-    <h1>Task Status</h1>
-    <p><strong>Task ID:</strong> {{ task.task_id }}</p>
-    <p><strong>Status:</strong> {{ task.status }}</p>
+<div class="container task-page">
+    <header class="task-header">
+        <a href="/" class="link-back">← Назад к форме</a>
+        <h1>Статус задачи</h1>
+        <div class="status-row">
+            <span class="status-chip status-{{ task.status.lower() }}">{{ task.status }}</span>
+            <span class="task-id">ID: {{ task.task_id }}</span>
+        </div>
+        <p class="task-progress">{{ task.progress }}</p>
+        {% if task.error %}
+            <p class="task-error">Ошибка: {{ task.error }}</p>
+        {% endif %}
+    </header>
 
-    {% if task.status == "COMPLETED" %}
-    <p><strong>Results:</strong></p>
-    {% if task.result %}
-    <pre>{{ task.result | tojson(indent=2) }}</pre>
-    {% else %}
-    <p>No data collected.</p>
-    {% endif %}
-    <br>
-    <p>Check the 'results' folder for the output file.</p>
-    {% elif task.status == "FAILED" %}
-    <p style="color: red;">Task failed. Check server logs for details.</p>
-    {% endif %}
+    <section class="task-meta">
+        <h2>Настройки поиска</h2>
+        <div class="meta-grid">
+            <div>
+                <span class="meta-label">Компания</span>
+            <span class="meta-value">{{ task.source_info.company_name }}</span>
+            </div>
+            <div>
+                <span class="meta-label">Сайт</span>
+                <span class="meta-value">{{ task.source_info.company_site }}</span>
+            </div>
+            <div>
+                <span class="meta-label">Источник</span>
+                <span class="meta-value">{{ task.source_info.source|upper }}</span>
+            </div>
+            <div>
+                <span class="meta-label">Область поиска</span>
+                <span class="meta-value">
+                    {% if task.source_info.search_scope == "city" %}
+                        Город: {{ task.source_info.location or "не указано" }}
+                    {% else %}
+                        Страна / общий поиск
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </section>
 
-    <br>
-    <a href="/">Back to Home</a>
+    <section class="task-summary">
+        <h2>Агрегированные метрики</h2>
+        {% if statistics %}
+            <table class="summary-table">
+                <tbody>
+                {% for key, label in summary_fields %}
+                    <tr>
+                        <th>{{ label }}</th>
+                        <td>{{ statistics.get(key, "—") if statistics.get(key) not in (None, "") else "—" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="muted">Агрегированные данные пока недоступны.</p>
+        {% endif %}
+    </section>
+
+    <section class="task-cards">
+        <div class="section-heading">
+            <h2>Найденные карточки</h2>
+            <span class="badge">{{ cards|length }}</span>
+        </div>
+
+        {% if cards %}
+            {% for card in cards %}
+                <details class="card-panel">
+                    <summary>
+                        <div>
+                            <h3>{{ card.get('card_name') or "Без названия" }}</h3>
+                            <p class="card-address">{{ card.get('card_address') or "Адрес не указан" }}</p>
+                        </div>
+                        <div class="card-summary-stats">
+                            <span>⭐ {{ card.get('card_rating') or "—" }}</span>
+                            <span>💬 {{ card.get('card_reviews_count') or 0 }}</span>
+                            {% if card.get('card_response_status') %}
+                                <span>🗨 {{ card.get('card_response_status') }}</span>
+                            {% endif %}
+                        </div>
+                    </summary>
+                    <div class="card-details-grid">
+                        <div>
+                            <p><strong>Телефон:</strong> {{ card.get('card_phone') or "—" }}</p>
+                            <p><strong>Сайт:</strong>
+                                {% if card.get('card_website') %}
+                                    <a href="{{ card.get('card_website') }}" target="_blank" rel="noopener">{{ card.get('card_website') }}</a>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </p>
+                            <p><strong>Рубрики:</strong> {{ card.get('card_rubrics') or "—" }}</p>
+                        </div>
+                        <div>
+                            <p><strong>Ответы:</strong> 
+                                {% if card.get('card_answered_reviews_count') is not none %}
+                                    Отвечено: {{ card.get('card_answered_reviews_count', 0) }} / {{ card.get('card_reviews_count', 0) }}
+                                {% else %}
+                                    {{ card.get('card_response_status') or "не указано" }}
+                                {% endif %}
+                            </p>
+                            <p><strong>Среднее время ответа:</strong>
+                                {% if card.get('card_avg_response_time') %}
+                                    {{ card.get('card_avg_response_time') }} дн.
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </p>
+                            <p><strong>Положительных отзывов (4-5⭐):</strong> {{ card.get('card_reviews_positive') or 0 }}</p>
+                            <p><strong>Отрицательных отзывов (1-3⭐):</strong> {{ card.get('card_reviews_negative') or 0 }}</p>
+                        </div>
+                    </div>
+                    {% set reviews = card.get('detailed_reviews') %}
+                    {% if reviews %}
+                        <div class="reviews-block">
+                            <h4>Отзывы ({{ reviews|length }})</h4>
+                            <ul class="review-list">
+                                {% for review in reviews %}
+                                    <li>
+                                        <div style="display: flex; align-items: start; gap: 10px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 8px; min-width: 200px; flex-wrap: wrap;">
+                                                {% if review.review_rating and review.review_rating|float > 0 %}
+                                                    {% set rating = review.review_rating|float %}
+                                                    {% set stars = "" %}
+                                                    {% if rating >= 4.5 %}
+                                                        {% set stars = "⭐⭐⭐⭐⭐" %}
+                                                    {% elif rating >= 4.0 %}
+                                                        {% set stars = "⭐⭐⭐⭐" %}
+                                                    {% elif rating >= 3.5 %}
+                                                        {% set stars = "⭐⭐⭐" %}
+                                                    {% elif rating >= 3.0 %}
+                                                        {% set stars = "⭐⭐⭐" %}
+                                                    {% elif rating >= 2.5 %}
+                                                        {% set stars = "⭐⭐" %}
+                                                    {% elif rating >= 2.0 %}
+                                                        {% set stars = "⭐⭐" %}
+                                                    {% elif rating >= 1.5 %}
+                                                        {% set stars = "⭐" %}
+                                                    {% elif rating >= 1.0 %}
+                                                        {% set stars = "⭐" %}
+                                                    {% else %}
+                                                        {% set stars = "—" %}
+                                                    {% endif %}
+                                                    <span style="font-size: 1.2em;">{{ stars }}</span>
+                                                    <span style="font-size: 0.9em; color: #666;">({{ "%.1f"|format(rating) }})</span>
+                                                {% endif %}
+                                                {% if review.review_author %}
+                                                    <span style="font-size: 0.85em; color: #888; font-weight: 500;">{{ review.review_author }}</span>
+                                                {% endif %}
+                                                {% if not review.review_rating or review.review_rating|float == 0 %}
+                                                    {% if not review.review_author %}
+                                                        <span style="color: #999;">—</span>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </div>
+                                            <p style="flex: 1; margin: 0; min-width: 200px;">
+                                                {% if review.review_text and review.review_text != "Без текста" %}
+                                                    {{ review.review_text }}
+                                                {% elif review.review_rating and review.review_rating|float > 0 %}
+                                                    <span style="color: #999; font-style: italic;">Без текста</span>
+                                                {% else %}
+                                                    <span style="color: #999;">Без текста</span>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% elif card.get('card_reviews_count', 0) > 0 %}
+                        <div class="reviews-block">
+                            <p class="muted">Отзывы найдены ({{ card.get('card_reviews_count', 0) }}), но детали не загружены.</p>
+                        </div>
+                    {% endif %}
+                </details>
+            {% endfor %}
+        {% else %}
+            <p class="muted">Карточки ещё не обработаны или данных не найдено.</p>
+        {% endif %}
+    </section>
+
+    <section class="task-files">
+        <h2>Файлы и уведомления</h2>
+        {% if task.result_file %}
+            <p>CSV сохранён как <code>{{ task.result_file }}</code> в папке <code>{{ output_dir }}</code>.</p>
+        {% else %}
+            <p class="muted">Файл с результатами пока не создан.</p>
+        {% endif %}
+        <p>Уведомление отправляется на: <strong>{{ task.email }}</strong></p>
+    </section>
 </div>
 </body>
 </html>

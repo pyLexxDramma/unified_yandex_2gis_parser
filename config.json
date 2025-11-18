@@ -13,7 +13,8 @@
     "binary_path": null,
     "start_maximized": false,
     "disable_images": true,
-    "memory_limit": 1024
+    "memory_limit": 1024,
+    "proxy_server": null
   },
   "parser": {
     "retries": 3,
@@ -26,7 +27,19 @@
     "yandex_captcha_wait": 20,
     "yandex_reviews_scroll_step": 500,
     "yandex_reviews_scroll_max_iter": 100,
-    "yandex_reviews_scroll_min_iter": 30
+    "yandex_reviews_scroll_min_iter": 30,
+    "yandex_card_selectors": [
+      "div.search-business-snippet-view",
+      "div.search-snippet-view__body._type_business",
+      "div[class*='search-snippet-view__body'][class*='_type_business']",
+      "a[href*='/maps/org/']:not([href*='/gallery/'])"
+    ],
+    "yandex_scroll_container": ".scroll__container, .scroll__content, .search-list-view__list",
+    "yandex_scrollable_element_selector": ".scroll__container, .scroll__content, [class*='search-list-view'], [class*='scroll']",
+    "yandex_scroll_step": 800,
+    "yandex_scroll_max_iter": 200,
+    "yandex_scroll_wait_time": 2.0,
+    "yandex_min_cards_threshold": 500
   },
   "writer": {
     "encoding": "utf-8-sig",

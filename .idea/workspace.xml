@@ -4,13 +4,27 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Проверка скриптов">
-      <change afterPath="$PROJECT_DIR$/clean_comments.py" afterDir="false" />
+    <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="Внедрение расширенной генерации URL-адресов для 2GIS и Яндекс Карт на основе области поиска и местоположения">
+      <change afterPath="$PROJECT_DIR$/src/notifications/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/notifications/sender.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/task_manager.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/webapp/static/script.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/webapp/templates/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/clean_comments.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/drivers/selenium_driver.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/drivers/selenium_driver.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/parsers/base_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/base_parser.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsers/gis_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/gis_parser.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsers/yandex_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/yandex_parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/storage/csv_writer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/storage/csv_writer.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/webapp/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/webapp/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/webapp/static/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/webapp/static/style.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/webapp/templates/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/webapp/templates/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/webapp/templates/task_status.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/webapp/templates/task_status.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_parser.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -69,6 +83,12 @@
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="E:\netology_p120\unified_yandex_2gis_parser\src\webapp\templates" />
+      <recent name="E:\netology_p120\unified_yandex_2gis_parser\src\webapp\static" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -99,6 +119,13 @@
       <workItem from="1763285911558" duration="821000" />
       <workItem from="1763286748703" duration="11748000" />
       <workItem from="1763355263041" duration="5250000" />
+      <workItem from="1763360532397" duration="10925000" />
+      <workItem from="1763372542728" duration="9302000" />
+      <workItem from="1763383402602" duration="2410000" />
+      <workItem from="1763440937757" duration="2233000" />
+      <workItem from="1763443654368" duration="194000" />
+      <workItem from="1763444325649" duration="714000" />
+      <workItem from="1763459465719" duration="320000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -244,7 +271,15 @@
       <option name="project" value="LOCAL" />
       <updated>1763299067349</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="Внедрение расширенной генерации URL-адресов для 2GIS и Яндекс Карт на основе области поиска и местоположения">
+      <option name="closed" value="true" />
+      <created>1763360709520</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1763360709520</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -269,7 +304,8 @@
     <MESSAGE value="Улучшена работа парсеров для сбора подробных данных о карточках, включая отзывы, информацию об ответах (для 2GIS), и включена агрегация. Обновлены GisParser для детального анализа JSON и YandexParser для анализа фрагментов. Включает обновленную логику отображения и агрегирования данных" />
     <MESSAGE value="Рефакторинг: Переход на Selenium для веб-автоматизации и внедрение базовой логики синтаксического анализа.&#10;&#10;Ключевые изменения включают:&#10;&#10;- ** Реализация драйвера Selenium:** Интегрирован &quot;SeleniumDriver&quot;, унаследованный от &quot;BaseDriver&quot;, для управления взаимодействиями с браузером.&#10;- **Управление конфигурацией:** Переработанная загрузка настроек с использованием моделей Pydantic из `src/config/models.py ` и`src/config/settings.py `, с поддержкой загрузки файлов `.env` и `config.json`.&#10;- ** Абстракция парсера:** Создан &quot;Базовый парсер&quot; и реализованы конкретные парсеры для 2GIS (&quot;GisParser&quot;) и Яндекс Карт (&quot;YandexParser`).&#10;- ** Интеграция с хранилищем:** Реализован &quot;CSVWriter&quot; для сохранения данных, включая опции для удаления пустых столбцов и дубликатов.&#10;- ** Веб-приложение: ** Разработано приложение FastAPI (`src/webapp/app.py`), предоставляющее веб-интерфейс для запуска и мониторинга задач очистки с ограничением скорости.&#10;- ** Обработка ошибок и ведение журнала:** Добавлены базовые функции обработки ошибок и ведения журнала во всех компонентах." />
     <MESSAGE value="Проверка скриптов" />
-    <option name="LAST_COMMIT_MESSAGE" value="Проверка скриптов" />
+    <MESSAGE value="Внедрение расширенной генерации URL-адресов для 2GIS и Яндекс Карт на основе области поиска и местоположения" />
+    <option name="LAST_COMMIT_MESSAGE" value="Внедрение расширенной генерации URL-адресов для 2GIS и Яндекс Карт на основе области поиска и местоположения" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/unified_yandex_2gis_parser$chrome_exe.coverage" NAME="chrome.exe Coverage Results" MODIFIED="1763023668517" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />

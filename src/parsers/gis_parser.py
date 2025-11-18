@@ -1,10 +1,10 @@
 from __future__ import annotations
 import json
 import re
+import logging
 import urllib.parse
 from typing import Any, Dict, List, Optional
-
-from bs4 import BeautifulSoup, Tag
+from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement as SeleniumWebElement
 
 from src.drivers.base_driver import BaseDriver
@@ -37,12 +37,27 @@ class GisParser(BaseParser):
         '''
         return xhr_script
 
-    def _get_links(self) -> List[Tag]:
+    def _get_links(self) -> List[SeleniumWebElement]:
         try:
-            links = self.driver.get_elements_by_locator(('css selector', 'a[href*="/firm/"], a[href*="/station/"]'))
-            return [link for link in links if isinstance(link, Tag) and 'href' in link.attrs]
+            # Используем методы BaseDriver вместо прямого доступа к Selenium
+            locator = ('css selector', 'a[href*="/firm/"], a[href*="/station/"]')
+            elements = self.driver.get_elements_by_locator(locator)
+            
+            valid_links = []
+            for el in elements:
+                try:
+                    if hasattr(el, 'tag_name') and el.tag_name.lower() == 'a':
+                        href = el.get_attribute('href') if hasattr(el, 'get_attribute') else None
+                        if href:
+                            valid_links.append(el)
+                except Exception as e:
+                    logger.warning(f"Error processing element: {e}")
+                    continue
+            
+            logger.info(f"Found {len(valid_links)} valid firm/station links")
+            return valid_links
         except Exception as e:
-            logger.error(f"Error getting link elements: {e}")
+            logger.error(f"Error getting link elements: {e}", exc_info=True)
             return []
 
     def _wait_requests_finished(self) -> bool:
@@ -92,9 +107,21 @@ class GisParser(BaseParser):
         return r"https://2gis\.ru/.*"
 
     def parse(self, url: str) -> Dict[str, Any]:
+        logger.info(f"Starting 2GIS parser for URL: {url}")
         self._url = url
-        self.driver.navigate(url)
-        self.driver.execute_script(self._add_xhr_counter_script())
+        
+        try:
+            logger.info(f"Navigating to URL: {url}")
+            self.driver.navigate(url)
+            logger.info("Page navigated successfully")
+            
+            logger.info("Injecting XHR counter script")
+            self.driver.execute_script(self._add_xhr_counter_script())
+            logger.info("XHR counter script injected")
+        except Exception as e:
+            logger.error(f"Error during initial navigation: {e}", exc_info=True)
+            raise
+        
         card_data_list = []
         aggregated_info = {
             'search_query_name': url.split('/search/')[1].split('?')[0].replace('+',
@@ -108,8 +135,13 @@ class GisParser(BaseParser):
             'aggregated_avg_response_time': 0.0,
         }
         try:
+            logger.info("Waiting for requests to finish...")
             self._wait_requests_finished()
+            logger.info("Requests finished, searching for links...")
+            
             card_elements = self._get_links()
+            logger.info(f"Found {len(card_elements)} card elements")
+            
             if not card_elements:
                 logger.warning(f"No firm/station links found on the initial page for URL: {url}.")
             processed_urls = set()
@@ -117,7 +149,7 @@ class GisParser(BaseParser):
                 if len(card_data_list) >= self._max_records:
                     break
                 try:
-                    card_url = element.get('href')
+                    card_url = element.get_attribute('href')
                     if not card_url or card_url in processed_urls:
                         continue
                     if not card_url.startswith('http'):

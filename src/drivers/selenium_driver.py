@@ -18,13 +18,91 @@ from src.config.settings import Settings
 logger = logging.getLogger(__name__)
 
 from urllib.parse import urlparse
+import tempfile
 
 
 def extract_credentials_from_proxy_url(proxy_url: str) -> tuple:
+    """Извлекает логин и пароль из URL прокси."""
     parsed_url = urlparse(proxy_url)
-    credentials = parsed_url.netloc.split('@')[0]
-    username, password = credentials.split(':')
-    return username, password
+    if '@' in parsed_url.netloc:
+        credentials = parsed_url.netloc.split('@')[0]
+        if ':' in credentials:
+            username, password = credentials.split(':', 1)
+            return username, password
+    return None, None
+
+
+def create_proxy_auth_extension(proxy_host: str, proxy_port: int, username: str, password: str) -> str:
+    """Создает расширение Chrome для прокси с аутентификацией."""
+    manifest_json = """
+    {
+        "version": "1.0.0",
+        "manifest_version": 2,
+        "name": "Chrome Proxy",
+        "permissions": [
+            "proxy",
+            "tabs",
+            "unlimitedStorage",
+            "storage",
+            "<all_urls>",
+            "webRequest",
+            "webRequestBlocking"
+        ],
+        "background": {
+            "scripts": ["background.js"]
+        },
+        "minimum_chrome_version":"22.0.0"
+    }
+    """
+
+    background_js = """
+    var config = {
+            mode: "fixed_servers",
+            rules: {
+              singleProxy: {
+                scheme: "http",
+                host: "%s",
+                port: parseInt(%s)
+              },
+              bypassList: ["localhost"]
+            }
+          };
+
+    chrome.proxy.settings.set({value: config, scope: "regular"}, function() {});
+
+    function callbackFn(details) {
+        return {
+            authCredentials: {
+                username: "%s",
+                password: "%s"
+            }
+        };
+    }
+
+    chrome.webRequest.onAuthRequired.addListener(
+                callbackFn,
+                {urls: ["<all_urls>"]},
+                ['blocking']
+    );
+    """ % (proxy_host, proxy_port, username, password)
+
+    # Создаем временную директорию для расширения
+    temp_dir = tempfile.mkdtemp()
+    extension_dir = os.path.join(temp_dir, "proxy_auth_extension")
+    os.makedirs(extension_dir, exist_ok=True)
+    
+    # Записываем файлы расширения
+    manifest_path = os.path.join(extension_dir, "manifest.json")
+    background_path = os.path.join(extension_dir, "background.js")
+    
+    with open(manifest_path, 'w', encoding='utf-8') as f:
+        f.write(manifest_json)
+    
+    with open(background_path, 'w', encoding='utf-8') as f:
+        f.write(background_js)
+    
+    logger.info(f"Proxy auth extension created at: {extension_dir}")
+    return extension_dir
 
 
 class SeleniumTab:
@@ -82,12 +160,36 @@ class SeleniumDriver(BaseDriver):
 
     def _initialize_driver(self):
         options = SeleniumChromeOptions()
+        
+        # Настройка headless режима
         if self.settings.chrome.headless:
             options.add_argument("--headless")
-        if self.settings.chrome.silent_browser:
             options.add_argument("--disable-gpu")
+            logger.info("Chrome running in headless mode.")
+        else:
+            logger.info("Chrome running in visible mode (headless=false).")
+        
+        # Важно: отключаем обнаружение автоматизации для более естественного поведения
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        
+        # Устанавливаем реальный User-Agent
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        
+        # Настройки для тихого режима (только логирование, не влияет на видимость окна или JavaScript)
+        # Важно: silent_browser не должен отключать JavaScript!
+        if self.settings.chrome.silent_browser:
             options.add_argument("--log-level=3")
             options.add_experimental_option('excludeSwitches', ['enable-logging'])
+            logger.info("Chrome running in silent mode (reduced logging, JavaScript still enabled).")
+        else:
+            logger.info("Chrome running in verbose mode (full logging enabled).")
+        
+        # Максимизация окна, если указано
+        if self.settings.chrome.start_maximized and not self.settings.chrome.headless:
+            options.add_argument("--start-maximized")
+            logger.info("Chrome will start maximized.")
 
         if self.settings.chrome.chromedriver_path:
             os.environ["webdriver.chrome.driver"] = self.settings.chrome.chromedriver_path
@@ -95,13 +197,52 @@ class SeleniumDriver(BaseDriver):
             pass
 
         if self.proxy:
-            options.add_argument(f"--proxy-server={self.proxy}")
+            # Проверяем, есть ли логин и пароль в URL прокси
+            parsed_proxy = urlparse(self.proxy)
+            username, password = extract_credentials_from_proxy_url(self.proxy)
+            
+            if username and password:
+                # Прокси с аутентификацией - используем расширение
+                logger.info(f"Using proxy with authentication: {parsed_proxy.hostname}:{parsed_proxy.port}")
+                try:
+                    proxy_host = parsed_proxy.hostname
+                    proxy_port = parsed_proxy.port or (8080 if parsed_proxy.scheme == 'http' else 443)
+                    extension_dir = create_proxy_auth_extension(proxy_host, proxy_port, username, password)
+                    options.add_argument(f"--load-extension={extension_dir}")
+                    logger.info(f"Proxy auth extension loaded from: {extension_dir}")
+                except Exception as e:
+                    logger.error(f"Failed to create proxy auth extension: {e}. Trying without auth...")
+                    # Fallback: пробуем без аутентификации
+                    options.add_argument(f"--proxy-server={parsed_proxy.scheme}://{proxy_host}:{proxy_port}")
+            else:
+                # Прокси без аутентификации
+                logger.info(f"Using proxy without authentication: {self.proxy}")
+                options.add_argument(f"--proxy-server={self.proxy}")
+        else:
+            # Explicitly disable proxy to avoid system proxy settings
+            options.add_argument("--no-proxy-server")
+            options.add_argument("--proxy-bypass-list=*")
+            # Disable proxy auto-detection
+            options.add_argument("--disable-proxy-certificate-handler")
+            # Additional options to prevent proxy usage
+            options.add_argument("--disable-extensions")
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
 
         try:
             service = Service(ChromeDriverManager().install())
             self.driver = Chrome(service=service, options=options)
             self.driver.set_page_load_timeout(60)
             self.driver.implicitly_wait(5)
+            
+            # Максимизация окна программно, если не через аргумент
+            if self.settings.chrome.start_maximized and not self.settings.chrome.headless:
+                try:
+                    self.driver.maximize_window()
+                    logger.info("Chrome window maximized.")
+                except Exception as e:
+                    logger.warning(f"Could not maximize window: {e}")
+            
             logger.info("Selenium WebDriver instance created.")
         except WebDriverException as e:
             logger.error(f"WebDriverException during initialization: {e}", exc_info=True)

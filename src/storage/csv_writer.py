@@ -23,8 +23,14 @@ class CSVOptions(BaseModel):
 
 
 class CSVWriter(FileWriter):
-    def __init__(self, settings: AppConfig):
-        writer_opts = settings.app_config.writer
+    def __init__(self, settings):
+        # Поддерживаем как Settings, так и AppConfig
+        if hasattr(settings, 'app_config'):
+            # Это Settings объект
+            writer_opts = settings.app_config.writer
+        else:
+            # Это AppConfig объект
+            writer_opts = settings.writer
         csv_opts = writer_opts.csv
 
         file_writer_options = FileWriterOptions(
@@ -34,9 +40,12 @@ class CSVWriter(FileWriter):
             output_dir=writer_opts.output_dir
         )
         super().__init__(options=file_writer_options)
-        self.csv_options = csv_opts
-        self._fieldnames: Optional[List[str]] = None
-        self._header_written: bool = False
+        # Используем object.__setattr__ для установки атрибута, так как FileWriter наследуется от Pydantic BaseModel
+        object.__setattr__(self, 'csv_options', csv_opts)
+        object.__setattr__(self, '_fieldnames', None)
+        object.__setattr__(self, '_header_written', False)
+        object.__setattr__(self, 'file_handle', None)
+        object.__setattr__(self, 'writer', None)
 
     def set_file_path(self, file_path: str):
         self._file_path = file_path
@@ -55,8 +64,11 @@ class CSVWriter(FileWriter):
                 raise
 
         try:
-            self.file_handle = open(self._file_path, 'w', newline='', encoding=self._options.encoding)
-            self.writer = csv.writer(self.file_handle)
+            # Используем object.__setattr__ для установки атрибутов в Pydantic модели
+            file_handle = open(self._file_path, 'w', newline='', encoding=self._options.encoding)
+            writer = csv.writer(file_handle)
+            object.__setattr__(self, 'file_handle', file_handle)
+            object.__setattr__(self, 'writer', writer)
             logger.info(f"CSV file opened for writing: {self._file_path} with encoding {self._options.encoding}")
         except Exception as e:
             logger.error(f"Error opening CSV file {self._file_path}: {e}", exc_info=True)
