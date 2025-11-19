@@ -54,7 +54,6 @@ class YandexParser(BaseParser):
             'aggregated_reviews_count': 'Всего отзывов',
             'aggregated_positive_reviews': 'Всего положительных отзывов',
             'aggregated_negative_reviews': 'Всего отрицательных отзывов',
-            'aggregated_answered_count': 'Всего отвечено (карточки)',
             'aggregated_avg_response_time': 'Среднее время ответа (дни)',
 
             'card_name': 'Название карточки',
@@ -111,34 +110,100 @@ class YandexParser(BaseParser):
 
     def _get_card_snippet_data(self, card_element: Tag) -> Optional[Dict[str, Any]]:
         try:
-            name_element = card_element.select_one(
-                'h1.card-title-view__title, .search-business-snippet-view__title')
-            name = name_element.get_text(strip=True) if name_element else ''
+            name_selectors = [
+                'h1.card-title-view__title',
+                '.search-business-snippet-view__title',
+                'a.search-business-snippet-view__title',
+                'a.catalogue-snippet-view__title',
+                'a[class*="title"]',
+                'h2[class*="title"]',
+                'h3[class*="title"]',
+            ]
+            name = ''
+            for selector in name_selectors:
+                name_element = card_element.select_one(selector)
+                if name_element:
+                    name = name_element.get_text(strip=True)
+                    if name:
+                        break
 
-            address_element = card_element.select_one(
-                'div.business-contacts-view__address-link, .search-business-snippet-view__address')
-            address = address_element.get_text(strip=True) if address_element else ''
+            address_selectors = [
+                'div.business-contacts-view__address-link',
+                '.search-business-snippet-view__address',
+                'div[class*="address"]',
+                'span[class*="address"]',
+            ]
+            address = ''
+            for selector in address_selectors:
+                address_element = card_element.select_one(selector)
+                if address_element:
+                    address = address_element.get_text(strip=True)
+                    if address:
+                        break
 
-            rating_element = card_element.select_one(
-                'span.business-rating-badge-view__rating-text, .search-business-snippet-view__rating-text')
-            rating = rating_element.get_text(strip=True) if rating_element else ''
+            rating_selectors = [
+                'span.business-rating-badge-view__rating-text',
+                '.search-business-snippet-view__rating-text',
+                'span[class*="rating"]',
+                'div[class*="rating"]',
+            ]
+            rating = ''
+            for selector in rating_selectors:
+                rating_element = card_element.select_one(selector)
+                if rating_element:
+                    rating = rating_element.get_text(strip=True)
+                    if rating:
+                        break
 
-            reviews_element = card_element.select_one(
-                'a.business-review-view__rating, .search-business-snippet-view__link-reviews')
-            reviews_count_text = reviews_element.get_text(strip=True) if reviews_element else ''
+            reviews_selectors = [
+                'a.business-review-view__rating',
+                '.search-business-snippet-view__link-reviews',
+                'a[class*="review"]',
+                'span[class*="review"]',
+            ]
             reviews_count = 0
-            if reviews_count_text:
-                match = re.search(r'(\d+)', reviews_count_text)
-                if match:
-                    reviews_count = int(match.group(0))
+            for selector in reviews_selectors:
+                reviews_element = card_element.select_one(selector)
+                if reviews_element:
+                    reviews_count_text = reviews_element.get_text(strip=True)
+                    if reviews_count_text:
+                        match = re.search(r'(\d+)', reviews_count_text)
+                        if match:
+                            reviews_count = int(match.group(0))
+                            break
+                if reviews_count > 0:
+                    break
 
-            website_element = card_element.select_one('a[itemprop="url"]')
-            website = website_element.get('href') if website_element else ''
+            website_selectors = [
+                'a[itemprop="url"]',
+                'a[class*="website"]',
+                'a[href^="http"]',
+            ]
+            website = ''
+            for selector in website_selectors:
+                website_element = card_element.select_one(selector)
+                if website_element:
+                    website = website_element.get('href', '')
+                    if website and 'yandex.ru' not in website:
+                        break
 
-            phone_element = card_element.select_one('span.business-contacts-view__phone-number')
-            phone = phone_element.get_text(strip=True) if phone_element else ''
+            phone_selectors = [
+                'span.business-contacts-view__phone-number',
+                'a[href^="tel:"]',
+                'span[class*="phone"]',
+            ]
+            phone = ''
+            for selector in phone_selectors:
+                phone_element = card_element.select_one(selector)
+                if phone_element:
+                    phone = phone_element.get_text(strip=True)
+                    if not phone and phone_element.get('href'):
+                        phone = phone_element.get('href').replace('tel:', '').strip()
+                    if phone:
+                        phone = phone.replace('Показать телефон', '').replace('показать телефон', '').strip()
+                        break
 
-            rubrics_elements = card_element.select('a.rubric-view__title')
+            rubrics_elements = card_element.select('a.rubric-view__title, a[class*="rubric"], a[href*="/rubric/"]')
             rubrics = "; ".join([r.get_text(strip=True) for r in rubrics_elements]) if rubrics_elements else ''
 
             return {
@@ -154,6 +219,9 @@ class YandexParser(BaseParser):
                 'card_reviews_positive': 0,
                 'card_reviews_negative': 0,
                 'card_reviews_texts': "",
+                'card_answered_reviews_count': 0,
+                'card_unanswered_reviews_count': reviews_count,
+                'detailed_reviews': [],
                 'review_rating': None,
                 'review_text': None,
             }
@@ -236,6 +304,7 @@ class YandexParser(BaseParser):
                             if href.startswith('tel:'):
                                 phone_text = href.replace('tel:', '').strip()
                         if phone_text:
+                            phone_text = phone_text.replace('Показать телефон', '').replace('показать телефон', '').strip()
                             break
                 if phone_text:
                     break
@@ -407,7 +476,9 @@ class YandexParser(BaseParser):
                     response_time_str = str(card_snippet['card_avg_response_time']).strip()
                     if response_time_str:
                         response_time_days = float(response_time_str)
-                        self._aggregated_data['total_response_time_sum_days'] += response_time_days
+                        if response_time_days > 0:
+                            self._aggregated_data['total_response_time_sum_days'] += response_time_days
+                            self._aggregated_data['total_response_time_calculated_count'] += 1
                 except (ValueError, TypeError):
                     logger.warning(
                         f"Could not convert response time to float for card '{card_snippet.get('card_name', 'Unknown')}': {card_snippet.get('card_avg_response_time')}")
@@ -876,10 +947,37 @@ class YandexParser(BaseParser):
                         if author_name:
                             break
 
+                    # Ищем дату отзыва для этого отзыва
+                    review_date = None
+                    review_date_selectors = [
+                        'time[datetime]',
+                        '[datetime]',
+                        'span[class*="date"]',
+                        'div[class*="date"]',
+                        'span[class*="time"]',
+                        'div[class*="time"]',
+                    ]
+                    for date_selector in review_date_selectors:
+                        date_elems = card.select(date_selector)
+                        for date_elem in date_elems:
+                            if date_elem.get('datetime'):
+                                date_text = date_elem.get('datetime')
+                                review_date = self._parse_date_string(date_text)
+                                if review_date:
+                                    break
+                            date_text = date_elem.get_text(strip=True)
+                            if date_text:
+                                review_date = self._parse_date_string(date_text)
+                                if review_date:
+                                    break
+                        if review_date:
+                            break
+                    
                     reviews_info['details'].append({
                         'review_rating': rating_value,
                         'review_text': review_text if review_text else "Без текста",
-                        'review_author': author_name if author_name else ""
+                        'review_author': author_name if author_name else "",
+                        'review_date': review_date.strftime('%d.%m.%Y') if review_date else ""
                     })
 
                     logger.debug(f"Added review: rating={rating_value}, text_length={len(review_text)}, text_preview={review_text[:50]}...")
@@ -1348,12 +1446,20 @@ class YandexParser(BaseParser):
                         old_scroll_top = self.driver.execute_script("return window.pageYOffset || document.documentElement.scrollTop || 0;")
                         old_scroll_height = self.driver.execute_script("return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);")
                         
+                        # Проверяем, что получили валидные значения
+                        if old_scroll_top is None:
+                            old_scroll_top = 0
+                        if old_scroll_height is None:
+                            old_scroll_height = 0
+                        
                         # Метод 1: scrollBy (пошаговая прокрутка)
                         self.driver.execute_script(f"window.scrollBy({{top: {scroll_step}, left: 0, behavior: 'auto'}});")
                         time.sleep(0.1)
                         
                         # Метод 2: scrollTo до низа (более агрессивный)
                         max_height = self.driver.execute_script("return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight);")
+                        if max_height is None:
+                            max_height = old_scroll_height
                         self.driver.execute_script(f"window.scrollTo({{top: {max_height}, left: 0, behavior: 'auto'}});")
                         time.sleep(0.1)
                         
@@ -1371,6 +1477,12 @@ class YandexParser(BaseParser):
                         # Проверяем результат
                         new_scroll_top = self.driver.execute_script("return window.pageYOffset || document.documentElement.scrollTop || 0;")
                         new_scroll_height = self.driver.execute_script("return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight);")
+                        
+                        # Проверяем, что получили валидные значения
+                        if new_scroll_top is None:
+                            new_scroll_top = old_scroll_top
+                        if new_scroll_height is None:
+                            new_scroll_height = old_scroll_height
                         
                         scroll_diff = new_scroll_top - old_scroll_top
                         height_diff = new_scroll_height - old_scroll_height
@@ -1462,16 +1574,22 @@ class YandexParser(BaseParser):
                         """
                         new_height_info = self.driver.execute_script(height_script)
                         if new_height_info and isinstance(new_height_info, dict):
-                            new_height = new_height_info.get('scrollHeight', 0)
-                            new_scroll_top = new_height_info.get('scrollTop', 0)
+                            new_height = new_height_info.get('scrollHeight', 0) or 0
+                            new_scroll_top = new_height_info.get('scrollTop', 0) or 0
                         else:
-                            new_height = 0
+                            new_height = current_height  # Используем текущую высоту
+                            new_scroll_top = 0
                             if scroll_iterations % 10 == 0:  # Логируем только периодически
                                 logger.warning(f"Could not get new scrollable element height info. Result: {new_height_info}")
                     else:
                         # Используем высоту документа
                         new_height = self.driver.execute_script("return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight);")
                         new_scroll_top = self.driver.execute_script("return window.pageYOffset || document.documentElement.scrollTop || 0;")
+                        # Проверяем на None
+                        if new_height is None:
+                            new_height = current_height
+                        if new_scroll_top is None:
+                            new_scroll_top = 0
                 except Exception as height_error:
                     logger.error(f"Error getting new height: {height_error}", exc_info=True)
                     new_height = current_height  # Используем старую высоту в случае ошибки
@@ -1599,36 +1717,62 @@ class YandexParser(BaseParser):
         return max_card_count if max_card_count > previous_card_count else previous_card_count
 
     def _parse_cards(self, search_query_url: str) -> List[Dict[str, Any]]:
+        # Инициализируем данные перед началом парсинга
+        self._collected_card_data = []
+        self._current_page_number = 1
+        self._aggregated_data = {
+            'total_cards': 0,
+            'total_rating_sum': 0.0,
+            'total_reviews_count': 0,
+            'total_positive_reviews': 0,
+            'total_negative_reviews': 0,
+            'total_answered_count': 0,
+            'total_answered_reviews_count': 0,
+            'total_unanswered_reviews_count': 0,
+            'total_response_time_sum_days': 0.0,
+            'total_response_time_calculated_count': 0,
+        }
+        
+        logger.info(f"=== Starting _parse_cards ===")
+        logger.info(f"Max records: {self._max_records}, Current cards: {len(self._collected_card_data)}")
         logger.info(f"Navigating to search results page: {search_query_url}")
-        self.driver.navigate(search_query_url)
-        self.check_captcha()
+        
+        try:
+            self.driver.navigate(search_query_url)
+            self.check_captcha()
+        except Exception as e:
+            logger.error(f"❌ Error navigating to search page: {e}", exc_info=True)
+            return []
         
         # Ждем загрузки страницы
         time.sleep(3)
-        
+
         processed_urls = set()
-        
+
         # Основной цикл обработки страниц
+        logger.info(f"Entering main while loop. Condition: {len(self._collected_card_data)} < {self._max_records}")
         while len(self._collected_card_data) < self._max_records:
             logger.info(f"Processing Yandex Maps page {self._current_page_number} (current cards collected: {len(self._collected_card_data)})")
             self.check_captcha()
 
             # ВАЖНО: Проверяем, что драйвер активен перед обработкой
+            logger.info(f"Checking driver status for page {self._current_page_number}...")
             try:
                 if hasattr(self.driver, 'driver') and self.driver.driver:
                     try:
                         current_url = self.driver.driver.current_url
-                        logger.debug(f"Current URL: {current_url}")
+                        logger.info(f"✓ Driver is active. Current URL: {current_url}")
                     except Exception as session_error:
-                        logger.error(f"Browser session lost: {session_error}")
+                        logger.error(f"❌ Browser session lost: {session_error}")
                         break
                 else:
-                    logger.error("Driver is not initialized")
+                    logger.error("❌ Driver is not initialized")
                     break
             except Exception as e:
-                logger.error(f"Error checking driver: {e}", exc_info=True)
+                logger.error(f"❌ Error checking driver: {e}", exc_info=True)
                 break
-            
+
+            logger.info(f"✓ Driver check passed. Entering main processing block for page {self._current_page_number}")
             try:
                 # Сохраняем URL текущей страницы поиска перед парсингом карточек
                 current_search_page_url = self.driver.driver.current_url if hasattr(self.driver, 'driver') and self.driver.driver else search_query_url
@@ -1685,7 +1829,7 @@ class YandexParser(BaseParser):
                                 if not card_url.startswith('http'):
                                     card_url = urllib.parse.urljoin("https://yandex.ru", card_url)
                                 processed_urls.add(card_url)
-                                
+
                                 logger.info(f"Navigating to card detail page: {card_url}")
                                 self.driver.navigate(card_url)
                                 self.check_captcha()
@@ -1726,6 +1870,7 @@ class YandexParser(BaseParser):
                 
                 # Собираем все ссылки на карточки
                 card_urls_to_parse = []
+                cards_without_links = 0
                 for card_element in cards_on_page:
                     if len(self._collected_card_data) + len(card_urls_to_parse) >= self._max_records:
                         break
@@ -1778,6 +1923,15 @@ class YandexParser(BaseParser):
                                     card_url = all_links[0].get('href')
                                     break
                                 current = parent
+                        
+                        # Дополнительный поиск: ищем любые ссылки внутри карточки
+                        if not card_url:
+                            all_links_in_card = card_element.find_all('a', href=True)
+                            for link in all_links_in_card:
+                                href = link.get('href', '')
+                                if '/maps/org/' in href and '/gallery/' not in href:
+                                    card_url = href
+                                    break
                     
                     if card_url:
                         if not card_url.startswith('http'):
@@ -1785,6 +1939,12 @@ class YandexParser(BaseParser):
                         if card_url not in processed_urls and '/gallery/' not in card_url:
                             card_urls_to_parse.append(card_url)
                             processed_urls.add(card_url)
+                    else:
+                        cards_without_links += 1
+                
+                if cards_without_links > 0:
+                    logger.warning(f"⚠ Found {cards_without_links} cards without valid links on page {self._current_page_number} (total cards: {len(cards_on_page)}, links found: {len(card_urls_to_parse)}). These cards will be skipped.")
+                logger.info(f"📊 Page {self._current_page_number} summary: {len(cards_on_page)} cards found, {len(card_urls_to_parse)} with links, {cards_without_links} without links")
                 
                 logger.info(f"✓ Collected {len(card_urls_to_parse)} unique card URLs. Starting to parse them...")
                 
@@ -1821,9 +1981,12 @@ class YandexParser(BaseParser):
                 if len(self._collected_card_data) >= self._max_records:
                     logger.info(f"Reached max records limit ({self._max_records}). Stopping.")
                     break
-                
+
             except Exception as e:
-                logger.error(f"Error processing cards on page {self._current_page_number}: {e}", exc_info=True)
+                logger.error(f"❌ Error processing cards on page {self._current_page_number}: {e}", exc_info=True)
+                logger.error(f"Error type: {type(e).__name__}, Error message: {str(e)}")
+                import traceback
+                logger.error(f"Full traceback:\n{traceback.format_exc()}")
                 break
 
             # ШАГ 6: Возвращаемся на страницу поиска для пагинации (если не достигли лимита)
@@ -1962,7 +2125,6 @@ class YandexParser(BaseParser):
                 self.check_captcha()
                 self._current_page_number += 1
                 time.sleep(3)
-                # Продолжаем цикл для обработки следующей страницы
                 continue
             else:
                 logger.info(f"No next page found after processing {len(self._collected_card_data)} cards on {self._current_page_number} pages. Stopping pagination.")
@@ -1996,11 +2158,16 @@ class YandexParser(BaseParser):
             self._search_query_name = "YandexMapsSearch"
 
         logger.info(f"Starting Yandex Parser for URL: {url}. Search query name extracted as: {self._search_query_name}")
+        logger.info(f"Parser initialized. Max records: {self._max_records}, Current cards: {len(self._collected_card_data)}")
 
         try:
+            logger.info("Calling _parse_cards...")
             collected_cards_data = self._parse_cards(url)
+            logger.info(f"_parse_cards returned {len(collected_cards_data)} cards")
         except Exception as e:
-            logger.error(f"Error in _parse_cards: {e}", exc_info=True)
+            logger.error(f"❌ Error in _parse_cards: {e}", exc_info=True)
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             collected_cards_data = []
 
         if not collected_cards_data:
@@ -2014,7 +2181,6 @@ class YandexParser(BaseParser):
                     'aggregated_reviews_count': 0,
                     'aggregated_positive_reviews': 0,
                     'aggregated_negative_reviews': 0,
-                    'aggregated_answered_count': 0,
                     'aggregated_avg_response_time': 0.0,
                 },
                 'cards_data': []
@@ -2052,15 +2218,20 @@ class YandexParser(BaseParser):
                 [1 for card in collected_cards_data if card.get('card_response_status', 'UNKNOWN') != 'UNKNOWN' or card.get('card_answered_reviews_count', 0) > 0])
 
             total_response_time_days = 0.0
+            cards_with_response_time = 0
             for card in collected_cards_data:
                 response_time_str = card.get('card_avg_response_time', '')
                 if response_time_str:
                     try:
-                        response_time_days += float(response_time_str)
+                        response_time_value = float(response_time_str)
+                        if response_time_value > 0:
+                            total_response_time_days += response_time_value
+                            cards_with_response_time += 1
                     except (ValueError, TypeError):
                         logger.warning(
                             f"Could not convert response time to float for card '{card.get('card_name', 'Unknown')}': {response_time_str}")
             self._aggregated_data['total_response_time_sum_days'] = total_response_time_days
+            self._aggregated_data['total_response_time_calculated_count'] = cards_with_response_time
 
 
         else:
@@ -2075,15 +2246,9 @@ class YandexParser(BaseParser):
             'aggregated_negative_reviews': self._aggregated_data['total_negative_reviews'],
             'aggregated_answered_reviews_count': self._aggregated_data['total_answered_reviews_count'],
             'aggregated_unanswered_reviews_count': self._aggregated_data['total_unanswered_reviews_count'],
-            'aggregated_answered_count': self._aggregated_data['total_answered_count'],
-            # Среднее время ответа = сумма времени ответа / количество карточек с ответами
             'aggregated_avg_response_time': round(
                 self._aggregated_data['total_response_time_sum_days'] / self._aggregated_data.get('total_response_time_calculated_count', 1), 2
-            ) if self._aggregated_data.get('total_response_time_calculated_count', 0) > 0 and self._aggregated_data['total_response_time_sum_days'] > 0 else (
-                round(
-                    self._aggregated_data['total_response_time_sum_days'] / self._aggregated_data['total_answered_count'], 2
-                ) if self._aggregated_data.get('total_answered_count', 0) > 0 and self._aggregated_data['total_response_time_sum_days'] > 0 else 0.0
-            ),
+            ) if self._aggregated_data.get('total_response_time_calculated_count', 0) > 0 and self._aggregated_data['total_response_time_sum_days'] > 0 else 0.0,
         }
 
         return {'aggregated_info': aggregated_info, 'cards_data': collected_cards_data}

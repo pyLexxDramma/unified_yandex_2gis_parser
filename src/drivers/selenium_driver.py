@@ -210,9 +210,12 @@ class SeleniumDriver(BaseDriver):
                     extension_dir = create_proxy_auth_extension(proxy_host, proxy_port, username, password)
                     options.add_argument(f"--load-extension={extension_dir}")
                     logger.info(f"Proxy auth extension loaded from: {extension_dir}")
+                    # НЕ добавляем --proxy-server при использовании расширения, оно само настроит прокси
                 except Exception as e:
                     logger.error(f"Failed to create proxy auth extension: {e}. Trying without auth...")
                     # Fallback: пробуем без аутентификации
+                    proxy_host = parsed_proxy.hostname
+                    proxy_port = parsed_proxy.port or (8080 if parsed_proxy.scheme == 'http' else 443)
                     options.add_argument(f"--proxy-server={parsed_proxy.scheme}://{proxy_host}:{proxy_port}")
             else:
                 # Прокси без аутентификации
@@ -283,13 +286,26 @@ class SeleniumDriver(BaseDriver):
     def navigate(self, url: str, referer: Optional[str] = None, timeout: int = 60) -> None:
         if not self._is_running or not self.driver:
             raise RuntimeError(f"{self.__class__.__name__} is not running or driver not initialized.")
+        
         try:
             self.driver.get(url)
             self.current_url = self.driver.current_url
             logger.info(f"Navigated to: {url}")
         except WebDriverException as e:
-            logger.error(f"WebDriverException navigating to {url}: {e}", exc_info=True)
-            if self.driver: self.current_url = self.driver.current_url
+            error_msg = str(e).lower()
+            # Проверяем, связана ли ошибка с прокси
+            if 'proxy' in error_msg or 'err_no_supported_proxies' in error_msg or 'net::err_proxy' in error_msg:
+                logger.error(f"❌ Proxy error while navigating to {url}: {e}")
+                logger.warning("⚠️  Proxy appears to be unavailable or misconfigured. Consider disabling proxy.")
+                if self.proxy:
+                    logger.warning(f"Current proxy: {self.proxy}")
+            else:
+                logger.error(f"WebDriverException navigating to {url}: {e}", exc_info=True)
+            if self.driver: 
+                try:
+                    self.current_url = self.driver.current_url
+                except:
+                    pass
             raise
 
     def get_page_source(self) -> str:
@@ -307,7 +323,17 @@ class SeleniumDriver(BaseDriver):
         try:
             return self.driver.execute_script(script, *args)
         except WebDriverException as e:
-            logger.error(f"WebDriverException executing script: {e}", exc_info=True)
+            error_msg = str(e).lower()
+            # Проверяем, связана ли ошибка с потерянной сессией
+            if 'invalid session id' in error_msg or 'session' in error_msg:
+                logger.error(f"❌ Browser session lost while executing script: {e}")
+                logger.warning("⚠️  Browser session is invalid. Driver may need to be restarted.")
+                # Не возвращаем None для числовых операций - возвращаем 0
+                if 'return' in script.lower() and ('scroll' in script.lower() or 'height' in script.lower() or 'offset' in script.lower()):
+                    logger.debug(f"Returning 0 for scroll/height script due to lost session")
+                    return 0
+            else:
+                logger.error(f"WebDriverException executing script: {e}", exc_info=True)
             return None
 
     def perform_click(self, element: Any) -> None:

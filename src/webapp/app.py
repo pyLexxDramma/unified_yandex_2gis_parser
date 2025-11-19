@@ -69,7 +69,6 @@ SUMMARY_FIELDS = [
     ("aggregated_negative_reviews", "Отрицательных отзывов (1-3⭐)"),
     ("aggregated_answered_reviews_count", "Отвечено отзывов"),
     ("aggregated_unanswered_reviews_count", "Не отвечено отзывов"),
-    ("aggregated_answered_count", "Карточек с ответами"),
     ("aggregated_avg_response_time", "Среднее время ответа (дни)"),
 ]
 

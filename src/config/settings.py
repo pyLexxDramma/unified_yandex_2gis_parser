@@ -220,6 +220,12 @@ try:
     root_logger.addHandler(file_handler)
 
     logger.setLevel(log_level_int)
+    
+    for logger_name in ['src.parsers', 'src.parsers.yandex_parser', 'src.parsers.gis_parser', 
+                        'src.drivers', 'src.drivers.selenium_driver', 'src.webapp', 'src.webapp.app']:
+        module_logger = logging.getLogger(logger_name)
+        module_logger.setLevel(log_level_int)
+        module_logger.propagate = True
 
     logger.info(f"Logger configured with level: {log_level_str}")
     logger.info(f"Log file: {log_file}")

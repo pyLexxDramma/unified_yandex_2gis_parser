@@ -124,54 +124,39 @@
                     {% if reviews %}
                         <div class="reviews-block">
                             <h4>Отзывы ({{ reviews|length }})</h4>
-                            <ul class="review-list">
+                            <ul class="review-list" style="list-style: none; padding: 0;">
                                 {% for review in reviews %}
-                                    <li>
-                                        <div style="display: flex; align-items: start; gap: 10px; flex-wrap: wrap;">
-                                            <div style="display: flex; align-items: center; gap: 8px; min-width: 200px; flex-wrap: wrap;">
-                                                {% if review.review_rating and review.review_rating|float > 0 %}
-                                                    {% set rating = review.review_rating|float %}
-                                                    {% set stars = "" %}
-                                                    {% if rating >= 4.5 %}
-                                                        {% set stars = "⭐⭐⭐⭐⭐" %}
-                                                    {% elif rating >= 4.0 %}
-                                                        {% set stars = "⭐⭐⭐⭐" %}
-                                                    {% elif rating >= 3.5 %}
-                                                        {% set stars = "⭐⭐⭐" %}
-                                                    {% elif rating >= 3.0 %}
-                                                        {% set stars = "⭐⭐⭐" %}
-                                                    {% elif rating >= 2.5 %}
-                                                        {% set stars = "⭐⭐" %}
-                                                    {% elif rating >= 2.0 %}
-                                                        {% set stars = "⭐⭐" %}
-                                                    {% elif rating >= 1.5 %}
-                                                        {% set stars = "⭐" %}
-                                                    {% elif rating >= 1.0 %}
-                                                        {% set stars = "⭐" %}
-                                                    {% else %}
-                                                        {% set stars = "—" %}
-                                                    {% endif %}
-                                                    <span style="font-size: 1.2em;">{{ stars }}</span>
-                                                    <span style="font-size: 0.9em; color: #666;">({{ "%.1f"|format(rating) }})</span>
+                                    <li style="padding: 8px 0; border-bottom: 1px solid #eee;">
+                                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                            {% if review.review_rating and review.review_rating|float > 0 %}
+                                                {% set rating = review.review_rating|float %}
+                                                {% set stars = "" %}
+                                                {% if rating >= 4.5 %}
+                                                    {% set stars = "⭐⭐⭐⭐⭐" %}
+                                                {% elif rating >= 4.0 %}
+                                                    {% set stars = "⭐⭐⭐⭐" %}
+                                                {% elif rating >= 3.5 %}
+                                                    {% set stars = "⭐⭐⭐" %}
+                                                {% elif rating >= 3.0 %}
+                                                    {% set stars = "⭐⭐⭐" %}
+                                                {% elif rating >= 2.5 %}
+                                                    {% set stars = "⭐⭐" %}
+                                                {% elif rating >= 2.0 %}
+                                                    {% set stars = "⭐⭐" %}
+                                                {% elif rating >= 1.5 %}
+                                                    {% set stars = "⭐" %}
+                                                {% elif rating >= 1.0 %}
+                                                    {% set stars = "⭐" %}
                                                 {% endif %}
-                                                {% if review.review_author %}
-                                                    <span style="font-size: 0.85em; color: #888; font-weight: 500;">{{ review.review_author }}</span>
-                                                {% endif %}
-                                                {% if not review.review_rating or review.review_rating|float == 0 %}
-                                                    {% if not review.review_author %}
-                                                        <span style="color: #999;">—</span>
-                                                    {% endif %}
-                                                {% endif %}
-                                            </div>
-                                            <p style="flex: 1; margin: 0; min-width: 200px;">
-                                                {% if review.review_text and review.review_text != "Без текста" %}
-                                                    {{ review.review_text }}
-                                                {% elif review.review_rating and review.review_rating|float > 0 %}
-                                                    <span style="color: #999; font-style: italic;">Без текста</span>
-                                                {% else %}
-                                                    <span style="color: #999;">Без текста</span>
-                                                {% endif %}
-                                            </p>
+                                                <span style="font-size: 1.1em;">{{ stars }}</span>
+                                                <span style="font-size: 0.9em; color: #666;">({{ "%.1f"|format(rating) }})</span>
+                                            {% endif %}
+                                            {% if review.review_author %}
+                                                <span style="font-size: 0.9em; color: #555; font-weight: 500;">{{ review.review_author }}</span>
+                                            {% endif %}
+                                            {% if review.review_date %}
+                                                <span style="font-size: 0.85em; color: #888;">{{ review.review_date }}</span>
+                                            {% endif %}
                                         </div>
                                     </li>
                                 {% endfor %}
