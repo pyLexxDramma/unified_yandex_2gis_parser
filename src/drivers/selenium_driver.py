@@ -159,6 +159,7 @@ class SeleniumDriver(BaseDriver):
         self._tab = SeleniumTab(self)
 
     def _initialize_driver(self):
+        import sys
         options = SeleniumChromeOptions()
         
         # Настройка headless режима
@@ -233,8 +234,75 @@ class SeleniumDriver(BaseDriver):
             options.add_experimental_option('useAutomationExtension', False)
 
         try:
-            service = Service(ChromeDriverManager().install())
-            self.driver = Chrome(service=service, options=options)
+            # Всегда используем ChromeDriverManager для автоматического подбора версии
+            # Это гарантирует совместимость с установленной версией Chrome
+            logger.info("Using ChromeDriverManager to automatically download compatible ChromeDriver...")
+            logger.info("This may take a moment to download ChromeDriver if needed...")
+            sys.stdout.flush()
+            chromedriver_path = ChromeDriverManager().install()
+            logger.info(f"ChromeDriverManager downloaded/verified ChromeDriver at: {chromedriver_path}")
+            service = Service(chromedriver_path)
+            logger.info("ChromeDriverManager setup completed.")
+            
+            logger.info("Creating Chrome WebDriver instance...")
+            service_path = service.executable_path if hasattr(service, 'executable_path') else getattr(service, 'path', 'N/A')
+            logger.info(f"Service executable path: {service_path}")
+            logger.info(f"Service executable exists: {os.path.exists(service_path) if service_path != 'N/A' else 'N/A'}")
+            
+            # Проверяем, что ChromeDriver файл существует и доступен
+            if service_path != 'N/A' and not os.path.exists(service_path):
+                raise FileNotFoundError(f"ChromeDriver executable not found at: {service_path}")
+            
+            try:
+                # Пробуем создать драйвер с таймаутом через threading
+                import threading
+                import sys
+                
+                driver_created = threading.Event()
+                driver_result = [None]
+                error_result = [None]
+                
+                def create_driver_thread():
+                    try:
+                        logger.info("Thread: Starting Chrome() call...")
+                        sys.stdout.flush()
+                        driver_result[0] = Chrome(service=service, options=options)
+                        logger.info("Thread: Chrome() call completed.")
+                        sys.stdout.flush()
+                    except Exception as e:
+                        error_result[0] = e
+                        logger.error(f"Thread: Error in Chrome() call: {e}", exc_info=True)
+                    finally:
+                        driver_created.set()
+                
+                logger.info("Calling Chrome(service=service, options=options)...")
+                logger.info("This may take a few seconds...")
+                sys.stdout.flush()
+                
+                thread = threading.Thread(target=create_driver_thread, daemon=True)
+                thread.start()
+                
+                # Ждем максимум 60 секунд
+                if driver_created.wait(timeout=60):
+                    if error_result[0]:
+                        raise error_result[0]
+                    self.driver = driver_result[0]
+                    if not self.driver:
+                        raise Exception("Chrome WebDriver instance is None after creation")
+                    logger.info("Chrome() call completed successfully.")
+                else:
+                    raise TimeoutException("Chrome WebDriver creation timed out after 60 seconds. Chrome may be blocked or not responding.")
+            except WebDriverException as e:
+                logger.error(f"WebDriverException during Chrome creation: {e}", exc_info=True)
+                raise
+            except Exception as e:
+                logger.error(f"Unexpected error during Chrome creation: {e}", exc_info=True)
+                raise
+            
+            if not self.driver:
+                raise Exception("Chrome WebDriver instance is None after creation")
+            
+            logger.info("Chrome WebDriver instance created successfully.")
             self.driver.set_page_load_timeout(60)
             self.driver.implicitly_wait(5)
             
@@ -257,9 +325,14 @@ class SeleniumDriver(BaseDriver):
     def start(self) -> None:
         if not self._is_running:
             try:
+                logger.info("=" * 60)
+                logger.info("Starting SeleniumDriver initialization...")
+                logger.info(f"ChromeDriver path from config: {self.settings.chrome.chromedriver_path}")
+                logger.info(f"Headless mode: {self.settings.chrome.headless}")
+                logger.info("=" * 60)
                 self._initialize_driver()
                 self._is_running = True
-                logger.info("SeleniumDriver started.")
+                logger.info("SeleniumDriver started successfully.")
             except Exception as e:
                 logger.error(f"Error starting SeleniumDriver: {e}", exc_info=True)
                 raise

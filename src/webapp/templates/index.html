@@ -9,7 +9,10 @@
 <body>
 
 <div class="container">
-    <h1>Web Scraper</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>Web Scraper</h1>
+        <a href="/logout" style="color: #666; text-decoration: none; font-size: 0.9em;">Выйти</a>
+    </div>
 
     {% if error %}
     <div class="message error">{{ error }}</div>
@@ -33,8 +36,9 @@
             <label for="source">Выберите источник:</label>
             <select id="source" name="source" required>
                 <option value="">-- Выберите --</option>
-                <option value="2gis">2GIS</option>
+                <option value="both">Оба источника (Яндекс + 2GIS)</option>
                 <option value="yandex">Яндекс.Карты</option>
+                <option value="2gis">2GIS</option>
             </select>
         </div>
 

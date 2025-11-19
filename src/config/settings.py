@@ -202,10 +202,20 @@ try:
     
     root_logger.handlers.clear()
     
-    console_handler = logging.StreamHandler()
+    import sys
+    # Создаем StreamHandler с небуферизованным выводом в stdout
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level_int)
     console_formatter = logging.Formatter(log_format, datefmt=date_format)
     console_handler.setFormatter(console_formatter)
+    # Отключаем буферизацию для немедленного вывода
+    if hasattr(console_handler.stream, 'reconfigure'):
+        try:
+            console_handler.stream.reconfigure(line_buffering=True)
+        except:
+            pass
+    # Принудительно сбрасываем буфер после каждого сообщения
+    console_handler.flush = lambda: console_handler.stream.flush() if hasattr(console_handler.stream, 'flush') else None
     root_logger.addHandler(console_handler)
     
     file_handler = RotatingFileHandler(
@@ -218,6 +228,25 @@ try:
     file_formatter = logging.Formatter(log_format, datefmt=date_format)
     file_handler.setFormatter(file_formatter)
     root_logger.addHandler(file_handler)
+
+    # Настраиваем принудительный flush для консольного вывода
+    class FlushingStreamHandler(logging.StreamHandler):
+        def emit(self, record):
+            super().emit(record)
+            if hasattr(self.stream, 'flush'):
+                self.stream.flush()
+    
+    # Заменяем обычный handler на FlushingStreamHandler
+    root_logger.removeHandler(console_handler)
+    flushing_handler = FlushingStreamHandler(sys.stdout)
+    flushing_handler.setLevel(log_level_int)
+    flushing_handler.setFormatter(console_formatter)
+    if hasattr(flushing_handler.stream, 'reconfigure'):
+        try:
+            flushing_handler.stream.reconfigure(line_buffering=True)
+        except:
+            pass
+    root_logger.addHandler(flushing_handler)
 
     logger.setLevel(log_level_int)
     

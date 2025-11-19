@@ -305,6 +305,13 @@ button:hover {
 .card-address {
     margin: 4px 0 0;
     color: #666;
+    font-size: 0.9em;
+}
+
+.card-phone {
+    margin: 4px 0 0;
+    color: #666;
+    font-size: 0.9em;
 }
 
 .card-summary-stats {
