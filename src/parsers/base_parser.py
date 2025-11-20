@@ -1,7 +1,7 @@
 from __future__ import annotations
 import abc
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Callable
 
 from selenium.webdriver.remote.webelement import WebElement
 from src.config.settings import AppConfig, Settings
@@ -37,6 +37,7 @@ class BaseParser(abc.ABC):
             self._reviews_scroll_iterations_min = 30
 
         self._is_running = False
+        self._progress_callback: Optional[Callable[[str], None]] = None
 
     @property
     def driver(self) -> BaseDriver:
@@ -90,3 +91,15 @@ class BaseParser(abc.ABC):
 
         encoded_params = urlencode(query_params)
         return urljoin(base_url, f"?{encoded_params}")
+    
+    def set_progress_callback(self, callback: Callable[[str], None]) -> None:
+        """Устанавливает callback для обновления прогресса"""
+        self._progress_callback = callback
+    
+    def _update_progress(self, message: str) -> None:
+        """Вызывает callback для обновления прогресса, если он установлен"""
+        if self._progress_callback:
+            try:
+                self._progress_callback(message)
+            except Exception as e:
+                logger.warning(f"Error calling progress callback: {e}")

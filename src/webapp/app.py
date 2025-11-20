@@ -330,6 +330,19 @@ def run_both_parsers_task(task_id: str, proxy_server: Optional[str] = None,
                 task_settings.parser.yandex_min_cards_threshold = threshold_value
             
             parser = YandexParser(driver=driver, settings=task_settings)
+            
+            # Устанавливаем callback для обновления прогресса
+            def update_yandex_progress(message: str):
+                if task_id in active_tasks:
+                    current_progress = active_tasks[task_id].progress or ''
+                    # Добавляем префикс для Yandex
+                    active_tasks[task_id].progress = f"Yandex: {message}"
+                    logger.info(f"Task {task_id}: Yandex - {message}")
+                    sys.stdout.flush()
+            
+            if hasattr(parser, 'set_progress_callback'):
+                parser.set_progress_callback(update_yandex_progress)
+            
             result = parser.parse(url=yandex_url)
             logger.info(f"Task {task_id}: Yandex parser completed. Found {len(result.get('cards_data', []))} cards")
             return result, None
@@ -359,6 +372,19 @@ def run_both_parsers_task(task_id: str, proxy_server: Optional[str] = None,
             driver.start()
             
             parser = GisParser(driver=driver, settings=settings)
+            
+            # Устанавливаем callback для обновления прогресса
+            def update_gis_progress(message: str):
+                if task_id in active_tasks:
+                    current_progress = active_tasks[task_id].progress or ''
+                    # Добавляем префикс для 2GIS
+                    active_tasks[task_id].progress = f"2GIS: {message}"
+                    logger.info(f"Task {task_id}: 2GIS - {message}")
+                    sys.stdout.flush()
+            
+            if hasattr(parser, 'set_progress_callback'):
+                parser.set_progress_callback(update_gis_progress)
+            
             result = parser.parse(url=gis_url)
             logger.info(f"Task {task_id}: 2GIS parser completed. Found {len(result.get('cards_data', []))} cards")
             return result, None

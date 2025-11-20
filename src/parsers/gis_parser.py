@@ -215,7 +215,7 @@ class GisParser(BaseParser):
                 time.sleep(self._scroll_wait_time)
                 scroll_iterations += 1
                 
-            except Exception as e:
+                except Exception as e:
                 logger.error(f"Error during scroll iteration {scroll_iterations + 1}: {e}")
                 break
         
@@ -901,20 +901,19 @@ class GisParser(BaseParser):
                     # Сохраняем оригинальный текст
                     original_review_text = review_text if review_text else ""
                     
-                    # Фильтрация
+                    # Фильтрация только служебных текстов
                     if review_text and any(skip in review_text.lower() for skip in ['оцените это место', 'по умолчанию']):
                         continue
                     
-                    if rating_value == 0.0 and (not review_text or review_text == "Без текста" or len(review_text.strip()) < 5):
-                        continue
-                    
-                    # Дедупликация
+                    # Дедупликация (единственная проверка перед сохранением)
                     normalized_text = review_text.strip().lower() if review_text else ""
                     normalized_author = author_name.strip().lower() if author_name else ""
+                    date_str = review_date.strftime('%Y-%m-%d') if review_date else ""
                     text_hash = hashlib.md5(normalized_text.encode('utf-8')).hexdigest()[:12] if normalized_text else ""
-                    review_key = f"{text_hash}_{rating_value}_{normalized_author[:20]}"
+                    review_key = f"{text_hash}_{rating_value or 0.0}_{normalized_author[:20]}_{date_str}"
                     
                     if review_key in seen_reviews:
+                        logger.debug(f"Skipping duplicate review: {normalized_text[:50]}... (rating: {rating_value}, author: {normalized_author[:20]}, date: {date_str})")
                         continue
                     
                     seen_reviews.add(review_key)
@@ -932,7 +931,7 @@ class GisParser(BaseParser):
                         'review_rating': rating_value,
                         'review_text': final_review_text,
                         'review_author': author_name if author_name else "",
-                        'review_date': review_date.strftime('%Y-%m-%d') if review_date else "",
+                        'review_date': self._format_date_russian(review_date) if review_date else "",
                         'has_response': has_response,
                         'response_date': response_date_str
                     })
@@ -988,10 +987,13 @@ class GisParser(BaseParser):
                 reviews_info['response_times_count'] = 0
             
             reviews_info['reviews_count'] = len(reviews_info['details'])
-            if reviews_info['reviews_count'] == 0 and reviews_count_total > 0:
-                reviews_info['reviews_count'] = reviews_count_total
             
-            logger.info(f"Reviews summary: total={reviews_info['reviews_count']}, positive={reviews_info['positive_reviews']}, negative={reviews_info['negative_reviews']}")
+            # Логируем информацию об отзывах для отладки
+            if reviews_info['reviews_count'] == 0 and reviews_count_total > 0:
+                logger.warning(f"Found {reviews_count_total} reviews count but 0 review cards. Using count from page.")
+                reviews_info['reviews_count'] = reviews_count_total
+            else:
+                logger.info(f"Reviews summary: total={reviews_info['reviews_count']}, positive={reviews_info['positive_reviews']}, negative={reviews_info['negative_reviews']}, with_rating={sum(1 for d in reviews_info['details'] if d.get('review_rating', 0) > 0)}, without_rating={sum(1 for d in reviews_info['details'] if d.get('review_rating', 0) == 0)}")
         
         except Exception as e:
             logger.error(f"Error processing reviews: {e}", exc_info=True)
@@ -1007,19 +1009,72 @@ class GisParser(BaseParser):
             '[itemprop="address"]',
             'span[class*="street"]',
             'div[class*="location"]',
+            '[class*="addressName"]',
+            '[class*="address-name"]',
+            'div[class*="contact"] [class*="address"]',
+            'span[class*="addressName"]',
         ]
         
         for selector in address_selectors:
             address_elements = soup.select(selector)
             for elem in address_elements:
                 address_text = elem.get_text(strip=True)
-                if address_text and len(address_text) > 5:
+                # Для 2GIS адрес может быть с городом, поэтому проверяем длину > 10
+                if address_text and len(address_text) > 10:
                     address = address_text
+                    logger.debug(f"Found address using selector '{selector}': {address[:80]}")
                     break
             if address:
                 break
         
+        # Если не нашли через селекторы, пробуем найти через текст с паттерном адреса
+        if not address:
+            # Ищем элементы, содержащие слова "улица", "проспект", "переулок" и т.д.
+            address_patterns = [
+                r'[Уу]лица\s+[^,]+,\s*\d+',
+                r'[Пп]роспект\s+[^,]+,\s*\d+',
+                r'[Пп]ереулок\s+[^,]+,\s*\d+',
+                r'[Пп]лощадь\s+[^,]+',
+            ]
+            all_text = soup.get_text()
+            for pattern in address_patterns:
+                match = re.search(pattern, all_text)
+                if match:
+                    address = match.group(0)
+                    logger.debug(f"Found address using pattern '{pattern}': {address[:80]}")
+                    break
+        
         return address
+    
+    def _format_date_russian(self, date_obj: datetime) -> str:
+        """Форматирует дату в русском формате: '12 октября 2025'"""
+        try:
+            import locale
+            try:
+                locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+            except:
+                try:
+                    locale.setlocale(locale.LC_TIME, 'Russian_Russia.1251')
+                except:
+                    pass
+            
+            months = {
+                1: 'января', 2: 'февраля', 3: 'марта', 4: 'апреля',
+                5: 'мая', 6: 'июня', 7: 'июля', 8: 'августа',
+                9: 'сентября', 10: 'октября', 11: 'ноября', 12: 'декабря'
+            }
+            
+            month_name = months.get(date_obj.month, date_obj.strftime('%B'))
+            return f"{date_obj.day} {month_name} {date_obj.year}"
+        except Exception as e:
+            logger.warning(f"Error formatting date: {e}")
+            return date_obj.strftime('%d.%m.%Y')
+    
+    def _normalize_address(self, address: str) -> str:
+        """Нормализует адрес для 2GIS: оставляет как есть (формат 'Улица Максима Горького, 71, Ижевск')"""
+        if not address:
+            return ""
+        return address.strip()
     
     def _extract_phone_from_page(self, soup: BeautifulSoup) -> str:
         """Извлекает телефон из HTML страницы карточки"""
@@ -1073,13 +1128,38 @@ class GisParser(BaseParser):
             answered_count = item.get('metadata', {}).get('answered_count', 0)
             avg_response_time_days = item.get('metadata', {}).get('avg_response_time_days', '')
             
-            # Парсим адрес и отзывы из HTML
+            # Пробуем извлечь адрес из API ответа
             address = ""
+            try:
+                # 2GIS API может содержать адрес в разных полях
+                address_name = item.get('address_name', '')
+                building_name = item.get('building_name', '')
+                full_name = item.get('full_name', '')
+                
+                # Собираем адрес из доступных полей
+                if address_name:
+                    address = address_name
+                elif building_name:
+                    address = building_name
+                elif full_name and ('улица' in full_name.lower() or 'проспект' in full_name.lower() or 'переулок' in full_name.lower()):
+                    address = full_name
+                
+                # Если нашли адрес в API, нормализуем его
+                if address:
+                    address = self._normalize_address(address)
+                    logger.debug(f"Found address from API: {address[:80]}")
+            except Exception as e:
+                logger.debug(f"Could not extract address from API: {e}")
+            
+            # Парсим адрес и отзывы из HTML (если не нашли в API)
             reviews_data = {'reviews_count': 0, 'positive_reviews': 0, 'negative_reviews': 0, 'details': []}
             
             try:
                 page_source, soup = self._get_page_source_and_soup()
                 address = self._extract_address_from_page(soup)
+                # Нормализуем адрес (для 2GIS оставляем как есть)
+                if address:
+                    address = self._normalize_address(address)
                 # Извлекаем телефон из HTML, если API не вернул
                 if not phones:
                     phone_from_html = self._extract_phone_from_page(soup)
@@ -1104,9 +1184,13 @@ class GisParser(BaseParser):
             if avg_response_time_days and isinstance(avg_response_time_days, (int, float)) and avg_response_time_days > 0:
                 avg_response_time_months = round(avg_response_time_days / 30.0, 2)
             
+            # Проверка наличия адреса
+            if not address or len(address.strip()) < 5:
+                logger.warning(f"Card '{name[:50]}' has no valid address. Address: '{address[:50] if address else ''}'")
+            
             return {
                 'card_name': name,
-                'card_address': address,
+                'card_address': address if address else '',
                 'card_rating': rating,
                 'card_reviews_count': reviews_data.get('reviews_count', reviews_count),
                 'card_website': website,
@@ -1120,6 +1204,7 @@ class GisParser(BaseParser):
                 'card_reviews_negative': reviews_data.get('negative_reviews', 0),
                 'card_reviews_texts': "",
                 'detailed_reviews': detailed_reviews_list,
+                'source': '2gis',
             }
         except Exception as e:
             logger.error(f"Error processing item data from response: {e}")
@@ -1245,6 +1330,7 @@ class GisParser(BaseParser):
             
             # ШАГ 1: Обрабатываем первую страницу и находим все страницы пагинации
             logger.info("Step 1: Processing first page and finding pagination...")
+            self._update_progress("Поиск карточек: этап 1/3 - обработка первой страницы...")
             self.driver.navigate(current_page_url)
             self._wait_requests_finished()
             time.sleep(2)
@@ -1273,6 +1359,7 @@ class GisParser(BaseParser):
             first_page_urls = self._get_links()
             all_card_urls.update(first_page_urls)
             logger.info(f"✓ Collected {len(first_page_urls)} card URLs from page 1. Total so far: {len(all_card_urls)}")
+            self._update_progress(f"Поиск карточек: найдено {len(all_card_urls)} карточек на странице 1")
             processed_pages.add(current_page_url)
             
             # Находим все ссылки на страницы пагинации
@@ -1298,6 +1385,7 @@ class GisParser(BaseParser):
                     continue
                 
                 logger.info(f"Step 2.{page_num}: Processing page {page_num}...")
+                self._update_progress(f"Поиск карточек: обработка страницы {page_num}/{len(pagination_urls) + 1}, найдено {len(all_card_urls)} карточек")
                 try:
                     self.driver.navigate(page_url)
                     self._wait_requests_finished()
@@ -1333,6 +1421,7 @@ class GisParser(BaseParser):
             
             # ШАГ 3: Парсим все карточки по очереди БЕЗ возврата на страницу поиска
             logger.info(f"Step 3: Starting to parse {len(card_urls)} cards (max: {self._max_records})...")
+            self._update_progress(f"Сканирование карточек: 0/{len(card_urls)}")
             processed_urls = set()
             for card_url in card_urls:
                 if len(card_data_list) >= self._max_records:
@@ -1348,6 +1437,7 @@ class GisParser(BaseParser):
                     processed_urls.add(card_url)
                     cards_processed = len(card_data_list)
                     logger.info(f"Parsing card {cards_processed + 1}/{len(card_urls)}: {card_url}")
+                    self._update_progress(f"Сканирование карточек: {cards_processed + 1}/{len(card_urls)}")
                     self.driver.navigate(card_url)
                     self._wait_requests_finished(timeout=20)
                     time.sleep(2)  # Дополнительное ожидание для загрузки страницы
@@ -1374,6 +1464,9 @@ class GisParser(BaseParser):
                             name_elem = soup.select_one('[class*="name"], [data-test="name"], h1')
                             name = name_elem.get_text(strip=True) if name_elem else ""
                             address = self._extract_address_from_page(soup)
+                            # Нормализуем адрес
+                            if address:
+                                address = self._normalize_address(address)
                             phone = self._extract_phone_from_page(soup)
                             reviews_data = self._get_card_reviews_info()
                             
@@ -1390,7 +1483,7 @@ class GisParser(BaseParser):
                                 
                                 parsed_card_data = {
                                     'card_name': name,
-                                    'card_address': address,
+                                    'card_address': address if address else '',
                                     'card_rating': "",
                                     'card_reviews_count': reviews_data.get('reviews_count', 0),
                                     'card_website': "",
@@ -1404,8 +1497,9 @@ class GisParser(BaseParser):
                                     'card_reviews_negative': reviews_data.get('negative_reviews', 0),
                                     'card_reviews_texts': "",
                                     'detailed_reviews': detailed_reviews_list,
+                                    'source': '2gis',
                                 }
-                        except Exception as e:
+                except Exception as e:
                             logger.error(f"Error parsing HTML for card {card_url}: {e}")
                     
                     if parsed_card_data:
@@ -1419,6 +1513,7 @@ class GisParser(BaseParser):
                     continue
             
             logger.info(f"✓ Completed parsing. Processed {len(card_data_list)}/{len(card_urls)} cards successfully.")
+            self._update_progress(f"Агрегация результатов: обработка {len(card_data_list)} карточек...")
             
             aggregated_info['total_cards_found'] = len(card_data_list)
             
@@ -1435,6 +1530,8 @@ class GisParser(BaseParser):
             # Округляем агрегированные значения
             if aggregated_info['aggregated_rating'] > 0:
                 aggregated_info['aggregated_rating'] = round(aggregated_info['aggregated_rating'], 2)
+            
+            self._update_progress(f"Агрегация результатов завершена: найдено {len(card_data_list)} карточек")
         except Exception as e:
             logger.error(f"Error during 2GIS parsing for URL {url}: {e}", exc_info=True)
         return {'aggregated_info': aggregated_info, 'cards_data': card_data_list}

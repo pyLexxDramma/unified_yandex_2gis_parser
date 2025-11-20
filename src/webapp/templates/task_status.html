@@ -19,6 +19,66 @@
         {% if task.error %}
             <p class="task-error">Ошибка: {{ task.error }}</p>
         {% endif %}
+        
+        <!-- Прогресс-бары с этапами для каждого источника -->
+        <div class="progress-stages-container" id="progress-stages-container" {% if task.status == 'RUNNING' or task.status == 'PENDING' %}style="display: block;"{% else %}style="display: none;"{% endif %}>
+            {% set task_source = task.source_info.source|lower if task.source_info.source else 'both' %}
+            <!-- Прогресс-бар для Яндекс -->
+            <div class="progress-source-block" id="progress-yandex-block" {% if task_source == 'both' or task_source == 'yandex' %}style="display: block;"{% else %}style="display: none;"{% endif %}>
+                <h3 style="margin: 0 0 10px 0; font-size: 1.1em;">Яндекс</h3>
+                <div class="progress-stages" id="progress-stages-yandex">
+                    <div class="stage" id="stage-search-yandex">
+                        <div class="stage-label">1. Поиск карточек</div>
+                        <div class="stage-progress">
+                            <div class="stage-bar" id="stage-search-bar-yandex"></div>
+                            <span class="stage-text" id="stage-search-text-yandex">0%</span>
+                        </div>
+                    </div>
+                    <div class="stage" id="stage-scan-yandex">
+                        <div class="stage-label">2. Сканирование карточек</div>
+                        <div class="stage-progress">
+                            <div class="stage-bar" id="stage-scan-bar-yandex"></div>
+                            <span class="stage-text" id="stage-scan-text-yandex">0%</span>
+                        </div>
+                    </div>
+                    <div class="stage" id="stage-aggregate-yandex">
+                        <div class="stage-label">3. Агрегация результатов</div>
+                        <div class="stage-progress">
+                            <div class="stage-bar" id="stage-aggregate-bar-yandex"></div>
+                            <span class="stage-text" id="stage-aggregate-text-yandex">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Прогресс-бар для 2GIS -->
+            <div class="progress-source-block" id="progress-2gis-block" {% if task_source == 'both' or task_source == '2gis' %}style="display: block;"{% else %}style="display: none;"{% endif %}>
+                <h3 style="margin: 0 0 10px 0; font-size: 1.1em;">2GIS</h3>
+                <div class="progress-stages" id="progress-stages-2gis">
+                    <div class="stage" id="stage-search-2gis">
+                        <div class="stage-label">1. Поиск карточек</div>
+                        <div class="stage-progress">
+                            <div class="stage-bar" id="stage-search-bar-2gis"></div>
+                            <span class="stage-text" id="stage-search-text-2gis">0%</span>
+                        </div>
+                    </div>
+                    <div class="stage" id="stage-scan-2gis">
+                        <div class="stage-label">2. Сканирование карточек</div>
+                        <div class="stage-progress">
+                            <div class="stage-bar" id="stage-scan-bar-2gis"></div>
+                            <span class="stage-text" id="stage-scan-text-2gis">0%</span>
+                        </div>
+                    </div>
+                    <div class="stage" id="stage-aggregate-2gis">
+                        <div class="stage-label">3. Агрегация результатов</div>
+                        <div class="stage-progress">
+                            <div class="stage-bar" id="stage-aggregate-bar-2gis"></div>
+                            <span class="stage-text" id="stage-aggregate-text-2gis">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </header>
 
     <section class="task-meta">
@@ -50,7 +110,12 @@
     </section>
 
     <section class="task-summary">
-        <h2>Агрегированные метрики</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2 style="margin: 0;">Агрегированные метрики</h2>
+            {% if task.status == 'COMPLETED' %}
+                <a href="/tasks/{{ task.task_id }}/download-pdf" class="btn-download-pdf" style="padding: 10px 20px; background: #2196F3; color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">📥 Скачать PDF отчет</a>
+            {% endif %}
+        </div>
         {% if statistics %}
             <table class="summary-table">
                 <tbody>
@@ -74,7 +139,13 @@
         </div>
 
         {% if cards %}
-            {% for card in cards %}
+            {% set yandex_cards = cards|selectattr('source', 'equalto', 'yandex')|list %}
+            {% set gis_cards = cards|selectattr('source', 'equalto', '2gis')|list %}
+            
+            {% if yandex_cards %}
+                <div class="cards-source-section">
+                    <h3 style="margin: 20px 0 10px 0; color: #1976D2;">📌 Яндекс ({{ yandex_cards|length }})</h3>
+                    {% for card in yandex_cards %}
                 <details class="card-panel">
                     <summary>
                         <div>
@@ -158,6 +229,9 @@
                                                 <span style="font-size: 0.85em; color: #888;">{{ review.review_date }}</span>
                                             {% endif %}
                                         </div>
+                                        {% if review.review_text %}
+                                            <p style="margin: 5px 0 0 0; color: #333; font-size: 0.95em;">{{ review.review_text }}</p>
+                                        {% endif %}
                                     </li>
                                 {% endfor %}
                             </ul>
@@ -168,7 +242,117 @@
                         </div>
                     {% endif %}
                 </details>
-            {% endfor %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            {% if gis_cards %}
+                <div class="cards-source-section">
+                    <h3 style="margin: 20px 0 10px 0; color: #1976D2;">📌 2GIS ({{ gis_cards|length }})</h3>
+                    {% for card in gis_cards %}
+                        <details class="card-panel">
+                            <summary>
+                                <div>
+                                    <h3>{{ card.get('card_name') or "Без названия" }}</h3>
+                                    <p class="card-address">{{ card.get('card_address') or "Адрес не указан" }}</p>
+                                </div>
+                                <div class="card-summary-stats">
+                                    <span>⭐ {{ card.get('card_rating') or "—" }}</span>
+                                    <span>💬 {{ card.get('card_reviews_count') or 0 }}</span>
+                                    {% if card.get('card_response_status') %}
+                                        <span>🗨 {{ card.get('card_response_status') }}</span>
+                                    {% endif %}
+                                </div>
+                            </summary>
+                            <div class="card-details-grid">
+                                <div>
+                                    <p><strong>Телефон:</strong> {{ card.get('card_phone') or "—" }}</p>
+                                    <p><strong>Сайт:</strong>
+                                        {% if card.get('card_website') %}
+                                            <a href="{{ card.get('card_website') }}" target="_blank" rel="noopener">{{ card.get('card_website') }}</a>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Рубрики:</strong> {{ card.get('card_rubrics') or "—" }}</p>
+                                </div>
+                                <div>
+                                    <p><strong>Ответы:</strong> 
+                                        {% if card.get('card_answered_reviews_count') is not none %}
+                                            Отвечено: {{ card.get('card_answered_reviews_count', 0) }} / {{ card.get('card_reviews_count', 0) }}
+                                        {% else %}
+                                            {{ card.get('card_response_status') or "не указано" }}
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Среднее время ответа:</strong>
+                                        {% if card.get('card_avg_response_time') %}
+                                            {{ card.get('card_avg_response_time') }} дн.
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Положительных отзывов (4-5⭐):</strong> {{ card.get('card_reviews_positive') or 0 }}</p>
+                                    <p><strong>Отрицательных отзывов (1-3⭐):</strong> {{ card.get('card_reviews_negative') or 0 }}</p>
+                                </div>
+                            </div>
+                            {% set reviews = card.get('detailed_reviews') %}
+                            {% if reviews %}
+                                <div class="reviews-block">
+                                    <h4>Отзывы ({{ reviews|length }})</h4>
+                                    <ul class="review-list" style="list-style: none; padding: 0;">
+                                        {% for review in reviews %}
+                                            <li style="padding: 8px 0; border-bottom: 1px solid #eee;">
+                                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                                    {% if review.review_rating and review.review_rating|float > 0 %}
+                                                        {% set rating = review.review_rating|float %}
+                                                        {% set stars = "" %}
+                                                        {% if rating >= 4.5 %}
+                                                            {% set stars = "⭐⭐⭐⭐⭐" %}
+                                                        {% elif rating >= 4.0 %}
+                                                            {% set stars = "⭐⭐⭐⭐" %}
+                                                        {% elif rating >= 3.5 %}
+                                                            {% set stars = "⭐⭐⭐" %}
+                                                        {% elif rating >= 3.0 %}
+                                                            {% set stars = "⭐⭐⭐" %}
+                                                        {% elif rating >= 2.5 %}
+                                                            {% set stars = "⭐⭐" %}
+                                                        {% elif rating >= 2.0 %}
+                                                            {% set stars = "⭐⭐" %}
+                                                        {% elif rating >= 1.5 %}
+                                                            {% set stars = "⭐" %}
+                                                        {% elif rating >= 1.0 %}
+                                                            {% set stars = "⭐" %}
+                                                        {% endif %}
+                                                        <span style="font-size: 1.1em;">{{ stars }}</span>
+                                                        <span style="font-size: 0.9em; color: #666;">({{ "%.1f"|format(rating) }})</span>
+                                                    {% endif %}
+                                                    {% if review.review_author %}
+                                                        <span style="font-size: 0.9em; color: #555; font-weight: 500;">{{ review.review_author }}</span>
+                                                    {% endif %}
+                                                    {% if review.review_date %}
+                                                        <span style="font-size: 0.85em; color: #888;">{{ review.review_date }}</span>
+                                                    {% endif %}
+                                                </div>
+                                                {% if review.review_text %}
+                                                    <p style="margin: 5px 0 0 0; color: #333; font-size: 0.95em;">{{ review.review_text }}</p>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% elif card.get('card_reviews_count', 0) > 0 %}
+                                <div class="reviews-block">
+                                    <p class="muted">Отзывы найдены ({{ card.get('card_reviews_count', 0) }}), но детали не загружены.</p>
+                                </div>
+                            {% endif %}
+                        </details>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            {% if not yandex_cards and not gis_cards %}
+                <p class="muted">Карточки ещё не обработаны или данных не найдено.</p>
+            {% endif %}
         {% else %}
             <p class="muted">Карточки ещё не обработаны или данных не найдено.</p>
         {% endif %}

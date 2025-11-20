@@ -5,9 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7e3d5d2a-18c5-4bd8-918e-a5799757a67a" name="Changes" comment="1. Рефакторинг логики парсинга карточек:&#10;   - Изменен порядок обработки: сначала полная прокрутка страницы поиска до загрузки всех карточек, затем сбор всех ссылок, затем последовательный парсинг каждой карточки&#10;   - Убрана бесконечная прокрутка после возврата на страницу поиска для пагинации&#10;   - Прокрутка выполняется один раз для каждой страницы в начале обработки&#10;   - После парсинга всех карточек возврат на страницу поиска только для поиска следующей страницы&#10;&#10;2. Улучшение извлечения данных карточек:&#10;   - Добавлен расширенный поиск имени карточки с несколькими селекторами&#10;   - Добавлено логирование при отсутствии имени карточки&#10;   - Добавлено сохранение HTML страницы для отладки, если имя не найдено&#10;&#10;3. Улучшение обработки ошибок:&#10;   - Добавлена проверка активности драйвера перед обработкой&#10;   - Улучшено логирование процесса парсинга">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/parsers/yandex_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/yandex_parser.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/webapp/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/webapp/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/parsers/gis_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsers/gis_parser.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -110,6 +108,7 @@
       <workItem from="1763444325649" duration="714000" />
       <workItem from="1763459465719" duration="320000" />
       <workItem from="1763481517784" duration="4706000" />
+      <workItem from="1763653692775" duration="45000" />
     </task>
     <task id="LOCAL-00001" summary="Первоначальная настройка структуры проекта">
       <option name="closed" value="true" />
@@ -276,6 +275,17 @@
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Первоначальная настройка структуры проекта" />

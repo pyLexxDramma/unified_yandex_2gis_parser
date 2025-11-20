@@ -5,6 +5,7 @@ import re
 import logging
 import time
 import urllib.parse
+import hashlib
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 
@@ -274,8 +275,34 @@ class YandexParser(BaseParser):
             if not card_snippet.get('card_name'):
                 logger.warning(f"Could not find card name on detail page. Available h1 tags: {[h.get_text(strip=True)[:50] for h in card_details_soup.select('h1')]}")
 
-            address_detail = card_details_soup.select_one('div.business-contacts-view__address-link')
-            card_snippet['card_address'] = address_detail.get_text(strip=True) if address_detail else ''
+            # Расширенный поиск адреса
+            address_selectors = [
+                'div.business-contacts-view__address-link',
+                'div[class*="address"]',
+                'span[class*="address"]',
+                'div[class*="location"]',
+                'span[class*="location"]',
+                '[itemprop="address"]',
+                'div[data-test="address"]',
+            ]
+            
+            address_detail = None
+            for selector in address_selectors:
+                address_detail = card_details_soup.select_one(selector)
+                if address_detail:
+                    address_text = address_detail.get_text(strip=True)
+                    if address_text and len(address_text) > 5:
+                        card_snippet['card_address'] = address_text
+                        logger.debug(f"Found card address using selector '{selector}': {address_text[:50]}")
+                        break
+            
+            # Нормализуем адрес
+            if card_snippet.get('card_address'):
+                card_snippet['card_address'] = self._normalize_address(card_snippet['card_address'])
+            
+            if not card_snippet.get('card_address') or len(card_snippet.get('card_address', '').strip()) < 5:
+                logger.warning(f"Card address not found for card: {card_snippet.get('card_name', 'Unknown')[:50]}")
+                card_snippet['card_address'] = ''
 
             rating_detail = card_details_soup.select_one('span.business-rating-badge-view__rating-text')
             card_snippet['card_rating'] = rating_detail.get_text(strip=True) if rating_detail else ''
@@ -439,6 +466,9 @@ class YandexParser(BaseParser):
                 except Exception as e:
                     logger.error(f"Could not save debug HTML: {e}")
                 return None
+            
+            # Добавляем source для Яндекс
+            card_snippet['source'] = 'yandex'
             
             logger.debug(f"Successfully extracted card data: name='{card_snippet.get('card_name', '')[:50]}', address='{card_snippet.get('card_address', '')[:50]}'")
             return card_snippet
@@ -896,32 +926,8 @@ class YandexParser(BaseParser):
                         cleaned_text = cleaned_text.strip()
                         if len(cleaned_text) > 20:  # Минимум 20 символов для текста отзыва
                             review_text = cleaned_text[:1000]  # Увеличиваем лимит до 1000 символов
-                    
-                    # Нормализуем текст для дедупликации
-                    normalized_text = review_text.strip().lower() if review_text else ""
-                    # Создаем ключ для дедупликации (текст + рейтинг)
-                    review_key = f"{normalized_text[:100]}_{rating_value}"  # Первые 100 символов + рейтинг
-                    
-                    # Пропускаем дубликаты
-                    if review_key in seen_reviews:
-                        logger.debug(f"Skipping duplicate review: {normalized_text[:50]}... (rating: {rating_value})")
-                        continue
-                    
-                    seen_reviews.add(review_key)
-                    
-                    # Если рейтинг не найден, но есть текст, пробуем найти рейтинг в тексте карточки еще раз
-                    if rating_value == 0.0 and review_text:
-                        # Ищем рейтинг в самом тексте отзыва или в родительских элементах
-                        parent_card = card.parent if hasattr(card, 'parent') else card
-                        rating_in_text = re.search(r'(\d)[.,]?\s*(?:звезд|star|⭐)', review_text, re.IGNORECASE)
-                        if rating_in_text:
-                            try:
-                                rating_value = float(rating_in_text.group(1))
-                                logger.debug(f"Found rating {rating_value} in review text")
-                            except:
-                                pass
 
-                    # Ищем имя автора отзыва
+                    # Ищем имя автора отзыва (ПЕРЕД проверкой обязательных полей)
                     author_name = ""
                     author_selectors = [
                         'div[class*="author"]',
@@ -973,11 +979,33 @@ class YandexParser(BaseParser):
                         if review_date:
                             break
                     
+                    # Фильтрация только служебных текстов
+                    if review_text and any(skip in review_text.lower() for skip in ['оцените это место', 'по умолчанию']):
+                        continue
+                    
+                    # Дедупликация (единственная проверка перед сохранением)
+                    # Нормализуем текст для дедупликации
+                    normalized_text = review_text.strip().lower() if review_text else ""
+                    normalized_author = author_name.strip().lower() if author_name else ""
+                    date_str = review_date.strftime('%Y-%m-%d') if review_date else ""
+                    
+                    # Создаем ключ для дедупликации (текст + рейтинг + автор + дата)
+                    text_hash = hashlib.md5(normalized_text.encode('utf-8')).hexdigest()[:12] if normalized_text else ""
+                    review_key = f"{text_hash}_{rating_value or 0.0}_{normalized_author[:20]}_{date_str}"
+                    
+                    # Пропускаем дубликаты
+                    if review_key in seen_reviews:
+                        logger.debug(f"Skipping duplicate review: {normalized_text[:50]}... (rating: {rating_value}, author: {normalized_author[:20]}, date: {date_str})")
+                        continue
+                    
+                    seen_reviews.add(review_key)
+                    
+                    # Добавляем отзыв (обязательные поля могут отсутствовать)
                     reviews_info['details'].append({
-                        'review_rating': rating_value,
-                        'review_text': review_text if review_text else "Без текста",
+                        'review_rating': rating_value if rating_value else 0.0,
+                        'review_text': review_text if review_text else "",
                         'review_author': author_name if author_name else "",
-                        'review_date': review_date.strftime('%d.%m.%Y') if review_date else ""
+                        'review_date': self._format_date_russian(review_date) if review_date else ""
                     })
 
                     logger.debug(f"Added review: rating={rating_value}, text_length={len(review_text)}, text_preview={review_text[:50]}...")
@@ -1238,6 +1266,55 @@ class YandexParser(BaseParser):
         except Exception as e:
             logger.debug(f"Error parsing date string '{date_string}': {e}")
             return None
+    
+    def _format_date_russian(self, date_obj: datetime) -> str:
+        """Форматирует дату в русском формате: '12 октября 2025'"""
+        try:
+            import locale
+            try:
+                locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+            except:
+                try:
+                    locale.setlocale(locale.LC_TIME, 'Russian_Russia.1251')
+                except:
+                    pass
+            
+            months = {
+                1: 'января', 2: 'февраля', 3: 'марта', 4: 'апреля',
+                5: 'мая', 6: 'июня', 7: 'июля', 8: 'августа',
+                9: 'сентября', 10: 'октября', 11: 'ноября', 12: 'декабря'
+            }
+            
+            month_name = months.get(date_obj.month, date_obj.strftime('%B'))
+            return f"{date_obj.day} {month_name} {date_obj.year}"
+        except Exception as e:
+            logger.warning(f"Error formatting date: {e}")
+            return date_obj.strftime('%d.%m.%Y')
+    
+    def _normalize_address(self, address: str) -> str:
+        """Нормализует адрес: 'Улица' -> 'ул.', 'Проспект' -> 'пр.' и т.д."""
+        if not address:
+            return ""
+        
+        replacements = {
+            'Улица': 'ул.',
+            'улица': 'ул.',
+            'УЛИЦА': 'ул.',
+            'Проспект': 'пр.',
+            'проспект': 'пр.',
+            'ПРОСПЕКТ': 'пр.',
+            'Проезд': 'проезд',
+            'Переулок': 'пер.',
+            'переулок': 'пер.',
+            'Площадь': 'пл.',
+            'площадь': 'пл.',
+        }
+        
+        normalized = address
+        for old, new in replacements.items():
+            normalized = normalized.replace(old, new)
+        
+        return normalized
 
     def _scroll_to_load_all_cards(self, max_scrolls: Optional[int] = None, scroll_step: Optional[int] = None) -> int:
         """Прокручивает контейнер результатов для загрузки всех карточек используя JavaScript."""
@@ -1349,6 +1426,9 @@ class YandexParser(BaseParser):
         except Exception as e:
             logger.error(f"Error finding scrollable element: {e}", exc_info=True)
             scrollable_element_selector = None
+        
+        # Обновляем прогресс в начале прокрутки
+        self._update_progress(f"Поиск карточек: начало прокрутки страницы...")
         
         while scroll_iterations < max_scrolls:
             try:
@@ -1529,30 +1609,8 @@ class YandexParser(BaseParser):
                 # ВАЖНО: Ждем достаточно долго, чтобы контент успел загрузиться
                 time.sleep(self._scroll_wait_time)
                 
-                # Дополнительно: ждем, пока высота не стабилизируется
-                if scrollable_element_selector:
-                    stability_wait = 0
-                    max_stability_wait = 5  # Максимум 5 попыток по 0.5 секунды
-                    last_check_height = current_height
-                    while stability_wait < max_stability_wait:
-                        time.sleep(0.5)
-                        # Экранируем селектор для JavaScript
-                        escaped_selector = scrollable_element_selector.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
-                        check_script = f"""
-                        var selector = '{escaped_selector}';
-                        var container = document.querySelector(selector);
-                        return container ? container.scrollHeight : null;
-                        """
-                        try:
-                            check_height = self.driver.execute_script(check_script)
-                            if check_height:
-                                if abs(check_height - last_check_height) < 10:
-                                    # Высота стабилизировалась
-                                    break
-                                last_check_height = check_height
-                        except:
-                            pass
-                        stability_wait += 1
+                # Убрана дополнительная проверка стабильности высоты для ускорения
+                # Одна проверка после sleep должна быть достаточной
                 
                 # Получаем новую высоту ПОСЛЕ прокрутки и ожидания
                 try:
@@ -1617,8 +1675,12 @@ class YandexParser(BaseParser):
                     max_card_count = new_card_count
                     # Логируем только когда находим больше карточек
                     logger.info(f"✓ Cards found: {new_card_count} (max so far: {max_card_count})")
+                    # Обновляем прогресс при нахождении новых карточек
+                    if scroll_iterations % 5 == 0:  # Обновляем каждые 5 итераций, чтобы не перегружать
+                        self._update_progress(f"Поиск карточек: прокрутка... найдено {max_card_count} карточек")
                 elif scroll_iterations % 10 == 0:  # Или каждую 10-ю итерацию
                     logger.info(f"Cards found: {new_card_count} (max so far: {max_card_count})")
+                    self._update_progress(f"Поиск карточек: прокрутка... найдено {max_card_count} карточек")
                 
                 # Проверяем, изменилась ли высота страницы
                 height_unchanged = abs(new_height - last_height) < 10
@@ -1780,6 +1842,7 @@ class YandexParser(BaseParser):
                 
                 # ШАГ 1: Прокручиваем страницу до тех пор, пока появляются новые карточки
                 logger.info(f"Step 1: Scrolling page {self._current_page_number} to load all cards...")
+                self._update_progress(f"Поиск карточек: прокрутка страницы {self._current_page_number}...")
                 initial_page_source, initial_soup = self._get_page_source_and_soup()
                 initial_cards = []
                 seen_ids = set()
@@ -1792,14 +1855,17 @@ class YandexParser(BaseParser):
                             initial_cards.append(card)
                 initial_count = len(initial_cards)
                 logger.info(f"Initial cards found before scrolling: {initial_count}")
+                self._update_progress(f"Поиск карточек: найдено {initial_count} карточек до прокрутки, страница {self._current_page_number}")
                 
                 # Прокручиваем до тех пор, пока появляются новые карточки
                 final_card_count = self._scroll_to_load_all_cards()
                 logger.info(f"Scroll completed. Found {final_card_count} cards (was {initial_count}).")
+                self._update_progress(f"Поиск карточек: прокрутка завершена, найдено {final_card_count} карточек на странице {self._current_page_number}")
                 time.sleep(3)  # Дополнительное ожидание после прокрутки
                 
                 # ШАГ 2: Собираем все ссылки на карточки после прокрутки
                 logger.info(f"Step 2: Collecting all card URLs from page {self._current_page_number}...")
+                self._update_progress(f"Поиск карточек: сбор ссылок на карточки со страницы {self._current_page_number}...")
                 page_source, soup = self._get_page_source_and_soup()
                 cards_on_page = []
                 seen_ids = set()
@@ -1812,6 +1878,7 @@ class YandexParser(BaseParser):
                             cards_on_page.append(card)
                 
                 logger.info(f"Found {len(cards_on_page)} cards on page {self._current_page_number} after scrolling")
+                self._update_progress(f"Поиск карточек: собрано {len(cards_on_page)} карточек на странице {self._current_page_number}")
                 
                 # Если не нашли через селекторы, пробуем найти через ссылки на организации
                 if not cards_on_page:
@@ -1947,6 +2014,7 @@ class YandexParser(BaseParser):
                 logger.info(f"📊 Page {self._current_page_number} summary: {len(cards_on_page)} cards found, {len(card_urls_to_parse)} with links, {cards_without_links} without links")
                 
                 logger.info(f"✓ Collected {len(card_urls_to_parse)} unique card URLs. Starting to parse them...")
+                self._update_progress(f"Поиск карточек завершен: найдено {len(card_urls_to_parse)} карточек на странице {self._current_page_number}")
                 
                 # Теперь парсим все карточки по очереди БЕЗ возврата на страницу поиска
                 for card_url in card_urls_to_parse:
@@ -1955,10 +2023,13 @@ class YandexParser(BaseParser):
                         break
 
                     try:
-                        logger.info(f"Parsing card {cards_processed_this_page + 1}/{len(card_urls_to_parse)}: {card_url}")
+                        cards_processed_total = len(self._collected_card_data)
+                        cards_processed_this_page_count = cards_processed_this_page + 1
+                        logger.info(f"Parsing card {cards_processed_this_page_count}/{len(card_urls_to_parse)}: {card_url}")
+                        self._update_progress(f"Сканирование карточек: {cards_processed_this_page_count}/{len(card_urls_to_parse)}")
                         self.driver.navigate(card_url)
                         self.check_captcha()
-                        time.sleep(2)
+                        time.sleep(3)  # Увеличена задержка для загрузки страницы
                         
                         card_details_soup = BeautifulSoup(self.driver.get_page_source(), "lxml")
                         card_snippet = self._extract_card_data_from_detail_page(card_details_soup)
